@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Image2Sheet</title>
+
+<!-- Favicon -->
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+
+<!-- Font Awesome -->
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+@page { size: var(--page-size); margin: var(--page-margin); }
+
+:root {
+  --accent:#2b6cb0;
+  --border:#e0e0e0;
+  --bg:#f4f6f8;
+  --shadow:0 10px 22px rgba(0,0,0,.1);
+  --shadow-hover:0 12px 26px rgba(0,0,0,.16);
+  --page-margin:15mm;
+  --grid-gap:10mm;
+}
+
+body {
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:var(--bg);
+}
+
+/* ---------- HEADER ---------- */
+.header {
+  position:fixed;
+  top:0;
+  left:0;
+  padding:16px 20px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  z-index:1000;
+}
+
+.logo {
+  width:42px;
+  height:42px;
+  border-radius:10px;
+  background:var(--accent);
+  display:grid;
+  place-items:center;
+  box-shadow:var(--shadow);
+}
+
+.logo img {
+  width:70%;
+  height:70%;
+}
+
+.title {
+  font-size:20px;
+  font-weight:600;
+}
+
+/* ---------- TOP BAR ---------- */
+.top-bar {
+  position:fixed;
+  top:0;
+  right:0;
+  padding:16px 20px;
+  display:flex;
+  gap:10px;
+  z-index:1000;
+}
+
+.top-bar select,
+.top-bar button {
+  padding:8px 12px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  background:white;
+  cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+
+.top-bar select:hover,
+.top-bar button:hover {
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-hover);
+}
+
+.top-bar button {
+  background:var(--accent);
+  color:white;
+  border:none;
+}
+
+/* ---------- MAIN ---------- */
+.main {
+  padding:110px 20px 40px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+
+/* ---------- DROP ZONE ---------- */
+.drop-zone {
+  max-width:620px;
+  width:100%;
+  border:2px dashed var(--border);
+  border-radius:14px;
+  padding:40px;
+  background:white;
+  text-align:center;
+  cursor:pointer;
+  margin-bottom:30px;
+  transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.drop-zone:hover {
+  border-color:var(--accent);
+  box-shadow:0 0 0 4px rgba(43,108,176,.12);
+  transform:translateY(-2px);
+}
+
+.drop-zone i {
+  font-size:36px;
+  color:var(--accent);
+}
+
+/* ---------- PAGES ---------- */
+#pages {
+  display:flex;
+  flex-direction:column;
+  gap:30px;
+}
+
+.page {
+  background:white;
+  display:grid;
+  gap:var(--grid-gap);
+  box-shadow:var(--shadow);
+}
+
+.page.a4.portrait { width:210mm;height:297mm; }
+.page.a4.landscape { width:297mm;height:210mm; }
+.page.a3.portrait { width:297mm;height:420mm; }
+.page.a3.landscape { width:420mm;height:297mm; }
+
+/* ---------- CELL ---------- */
+.cell {
+  position:relative;
+  border-radius:12px;
+  overflow:hidden;
+  border:1px solid var(--border);
+}
+
+.cell img {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+/* ---------- IMAGE TOOLS ---------- */
+.tools {
+  position:absolute;
+  top:6px;
+  right:6px;
+  display:flex;
+  gap:6px;
+}
+
+.tools button {
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  border:none;
+  background:rgba(0,0,0,.65);
+  color:white;
+  cursor:pointer;
+}
+
+.exporting .tools {
+  display:none !important;
+}
+
+/* ---------- PROGRESS OVERLAY ---------- */
+.progress-overlay {
+  position:fixed;
+  inset:0;
+  background:rgba(255,255,255,.85);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:2000;
+}
+
+.progress-box {
+  width:320px;
+  background:white;
+  padding:20px;
+  border-radius:10px;
+  box-shadow:var(--shadow);
+}
+
+.progress-box strong {
+  display:block;
+  margin-bottom:10px;
+}
+
+.progress-bar {
+  height:8px;
+  background:#eee;
+  border-radius:4px;
+  overflow:hidden;
+}
+
+.progress-fill {
+  height:100%;
+  width:0%;
+  background:var(--accent);
+  transition:width .25s ease;
+}
+</style>
+</head>
+
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">
+    <img src="logo.svg" alt="Image2Sheet logo">
+  </div>
+  <div class="title">Image2Sheet</div>
+</div>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <select id="paperSize"><option value="a4">A4</option><option value="a3">A3</option></select>
+  <select id="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
+  <select id="cardsPerPage">
+    <option value="1">1</option><option value="2">2</option>
+    <option value="4" selected>4</option><option value="6">6</option><option value="9">9</option>
+  </select>
+  <select id="layoutMode"><option value="gap">Gap</option><option value="fill">Fill</option></select>
+
+  <button id="backingBtn"></button>
+  <input type="file" id="backingInput" accept="image/*" hidden>
+
+  <button onclick="exportPDF()"><i class="fa-solid fa-file-pdf"></i></button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="drop-zone" id="dropZone">
+    <i class="fa-solid fa-cloud-arrow-up"></i>
+    <p><strong>Drop images here</strong><br>or click to choose files</p>
+    <input type="file" id="fileInput" multiple accept="image/*" hidden>
+  </div>
+  <div id="pages"></div>
+</div>
+
+<!-- PROGRESS -->
+<div class="progress-overlay" id="progressOverlay">
+  <div class="progress-box">
+    <strong>Generating PDF…</strong>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const { jsPDF } = window.jspdf;
+
+const pagesEl = document.getElementById("pages");
+const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+const backingBtn = document.getElementById("backingBtn");
+const backingInput = document.getElementById("backingInput");
+
+const progressOverlay = document.getElementById("progressOverlay");
+const progressFill = document.getElementById("progressFill");
+
+const paperSize = document.getElementById("paperSize");
+const orientation = document.getElementById("orientation");
+const cardsPerPage = document.getElementById("cardsPerPage");
+const layoutMode = document.getElementById("layoutMode");
+
+let images = [];
+let backingImage = null;
+let dragIndex = null;
+
+/* ---------- UI STATE ---------- */
+function updateBackingButton() {
+  backingBtn.innerHTML = backingImage
+    ? `<i class="fa-solid fa-trash"></i> Remove backing`
+    : `<i class="fa-solid fa-image"></i> Backing`;
+}
+updateBackingButton();
+
+/* ---------- INPUT ---------- */
+dropZone.onclick = () => fileInput.click();
+fileInput.onchange = e => addImages(e.target.files);
+
+dropZone.ondragover = e => e.preventDefault();
+dropZone.ondrop = e => {
+  e.preventDefault();
+  addImages(e.dataTransfer.files);
+};
+
+backingBtn.onclick = () => {
+  if (backingImage) {
+    backingImage = null;
+    backingInput.value = "";
+    updateBackingButton();
+    render();
+  } else {
+    backingInput.click();
+  }
+};
+
+backingInput.onchange = e => {
+  if (!e.target.files[0]) return;
+  backingImage = URL.createObjectURL(e.target.files[0]);
+  updateBackingButton();
+  render();
+};
+
+[paperSize,orientation,cardsPerPage,layoutMode].forEach(e => e.onchange = render);
+
+function addImages(files) {
+  [...files].forEach(f => f.type.startsWith("image/") && images.push(URL.createObjectURL(f)));
+  render();
+}
+
+function grid(n) {
+  const c = Math.ceil(Math.sqrt(n));
+  return { cols:c, rows:Math.ceil(n/c) };
+}
+
+/* ---------- RENDER ---------- */
+function render() {
+  pagesEl.innerHTML = "";
+  const per = +cardsPerPage.value;
+  const { cols, rows } = grid(per);
+
+  document.documentElement.style.setProperty("--page-size", `${paperSize.value.toUpperCase()} ${orientation.value}`);
+  document.documentElement.style.setProperty("--page-margin", layoutMode.value==="fill"?"0mm":"15mm");
+  document.documentElement.style.setProperty("--grid-gap", layoutMode.value==="fill"?"0mm":"10mm");
+
+  for (let i = 0; i < images.length; i += per) {
+    renderFront(images.slice(i, i + per), i, cols, rows);
+    if (backingImage) renderBacking(per, cols, rows);
+  }
+}
+
+function renderFront(srcs, base, cols, rows) {
+  const page = document.createElement("div");
+  page.className = `page ${paperSize.value} ${orientation.value}`;
+  page.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+  page.style.gridTemplateRows = `repeat(${rows},1fr)`;
+
+  srcs.forEach((src, idx) => {
+    const i = base + idx;
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.draggable = true;
+    cell.dataset.index = i;
+
+    const img = document.createElement("img");
+    img.src = src;
+
+    const tools = document.createElement("div");
+    tools.className = "tools";
+    tools.innerHTML = `
+      <button onclick="copyImg(${i})"><i class="fa-solid fa-copy"></i></button>
+      <button onclick="deleteImg(${i})"><i class="fa-solid fa-trash"></i></button>
+    `;
+
+    cell.append(img, tools);
+    cell.ondragstart = () => dragIndex = i;
+    cell.ondragover = e => e.preventDefault();
+    cell.ondrop = () => {
+      const moved = images.splice(dragIndex, 1)[0];
+      images.splice(i, 0, moved);
+      render();
+    };
+
+    page.appendChild(cell);
+  });
+
+  pagesEl.appendChild(page);
+}
+
+function renderBacking(per, cols, rows) {
+  const page = document.createElement("div");
+  page.className = `page ${paperSize.value} ${orientation.value}`;
+  page.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+  page.style.gridTemplateRows = `repeat(${rows},1fr)`;
+
+  Array(per).fill(backingImage).forEach(src => {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    const img = document.createElement("img");
+    img.src = src;
+    cell.appendChild(img);
+    page.appendChild(cell);
+  });
+
+  pagesEl.appendChild(page);
+}
+
+function copyImg(i) { images.splice(i + 1, 0, images[i]); render(); }
+function deleteImg(i) { images.splice(i, 1); render(); }
+
+/* ---------- PDF EXPORT (WITH PROGRESS) ---------- */
+async function exportPDF() {
+  const pages = document.querySelectorAll(".page");
+  if (!pages.length) return;
+
+  progressOverlay.style.display = "flex";
+  progressFill.style.width = "0%";
+  document.body.classList.add("exporting");
+
+  const pdf = new jsPDF({
+    orientation: orientation.value,
+    unit: "mm",
+    format: paperSize.value
+  });
+
+  for (let i = 0; i < pages.length; i++) {
+    const canvas = await html2canvas(pages[i], {
+      scale: 2,
+      backgroundColor: "#ffffff"
+    });
+
+    if (i > 0) pdf.addPage();
+    pdf.addImage(
+      canvas.toDataURL("image/jpeg", 0.98),
+      "JPEG",
+      0,
+      0,
+      pdf.internal.pageSize.getWidth(),
+      pdf.internal.pageSize.getHeight()
+    );
+
+    progressFill.style.width = `${Math.round(((i + 1) / pages.length) * 100)}%`;
+  }
+
+  progressOverlay.style.display = "none";
+  document.body.classList.remove("exporting");
+
+  window.open(pdf.output("bloburl"), "_blank");
+}
+</script>
+
+</body>
+</html>
