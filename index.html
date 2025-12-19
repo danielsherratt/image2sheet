@@ -239,18 +239,43 @@ body {
 
 <!-- TOP BAR -->
 <div class="top-bar">
-  <select id="paperSize"><option value="a4">A4</option><option value="a3">A3</option></select>
-  <select id="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
-  <select id="cardsPerPage">
-    <option value="1">1</option><option value="2">2</option>
-    <option value="4" selected>4</option><option value="6">6</option><option value="9">9</option>
+  <select id="paperSize">
+    <option value="a4">A4</option>
+    <option value="a3">A3</option>
   </select>
-  <select id="layoutMode"><option value="gap">Gap</option><option value="fill">Fill</option></select>
+
+  <select id="orientation">
+    <option value="portrait">Portrait</option>
+    <option value="landscape">Landscape</option>
+  </select>
+
+  <!-- Quantity -->
+  <select id="cardsPerPage">
+    <option value="1">1</option>
+    <option value="2">2</option>
+    <option value="4" selected>4</option>
+    <option value="6">6</option>
+    <option value="9">9</option>
+  </select>
+
+  <!-- Card Size -->
+  <select id="cardSize">
+    <option value="standard" selected>
+      Standard Game Card (63 × 88 mm)
+    </option>
+  </select>
+
+  <select id="layoutMode">
+    <option value="gap">Gap</option>
+    <option value="fill">Fill</option>
+  </select>
 
   <button id="backingBtn"></button>
   <input type="file" id="backingInput" accept="image/*" hidden>
 
-  <button onclick="exportPDF()"><i class="fa-solid fa-file-pdf"></i></button>
+  <button onclick="exportPDF()">
+    <i class="fa-solid fa-file-pdf"></i>
+  </button>
 </div>
 
 <!-- MAIN -->
@@ -288,7 +313,13 @@ const progressFill = document.getElementById("progressFill");
 const paperSize = document.getElementById("paperSize");
 const orientation = document.getElementById("orientation");
 const cardsPerPage = document.getElementById("cardsPerPage");
+const cardSize = document.getElementById("cardSize");
 const layoutMode = document.getElementById("layoutMode");
+
+/* Card size data (future use) */
+const CARD_SIZES = {
+  standard: { width: 63, height: 88 } // mm
+};
 
 let images = [];
 let backingImage = null;
@@ -330,7 +361,8 @@ backingInput.onchange = e => {
   render();
 };
 
-[paperSize,orientation,cardsPerPage,layoutMode].forEach(e => e.onchange = render);
+[paperSize, orientation, cardsPerPage, cardSize, layoutMode]
+  .forEach(e => e.onchange = render);
 
 function addImages(files) {
   [...files].forEach(f => f.type.startsWith("image/") && images.push(URL.createObjectURL(f)));
@@ -348,9 +380,18 @@ function render() {
   const per = +cardsPerPage.value;
   const { cols, rows } = grid(per);
 
-  document.documentElement.style.setProperty("--page-size", `${paperSize.value.toUpperCase()} ${orientation.value}`);
-  document.documentElement.style.setProperty("--page-margin", layoutMode.value==="fill"?"0mm":"15mm");
-  document.documentElement.style.setProperty("--grid-gap", layoutMode.value==="fill"?"0mm":"10mm");
+  document.documentElement.style.setProperty(
+    "--page-size",
+    `${paperSize.value.toUpperCase()} ${orientation.value}`
+  );
+  document.documentElement.style.setProperty(
+    "--page-margin",
+    layoutMode.value === "fill" ? "0mm" : "15mm"
+  );
+  document.documentElement.style.setProperty(
+    "--grid-gap",
+    layoutMode.value === "fill" ? "0mm" : "10mm"
+  );
 
   for (let i = 0; i < images.length; i += per) {
     renderFront(images.slice(i, i + per), i, cols, rows);
@@ -369,7 +410,6 @@ function renderFront(srcs, base, cols, rows) {
     const cell = document.createElement("div");
     cell.className = "cell";
     cell.draggable = true;
-    cell.dataset.index = i;
 
     const img = document.createElement("img");
     img.src = src;
@@ -417,7 +457,7 @@ function renderBacking(per, cols, rows) {
 function copyImg(i) { images.splice(i + 1, 0, images[i]); render(); }
 function deleteImg(i) { images.splice(i, 1); render(); }
 
-/* ---------- PDF EXPORT (WITH PROGRESS) ---------- */
+/* ---------- PDF EXPORT ---------- */
 async function exportPDF() {
   const pages = document.querySelectorAll(".page");
   if (!pages.length) return;
@@ -433,10 +473,7 @@ async function exportPDF() {
   });
 
   for (let i = 0; i < pages.length; i++) {
-    const canvas = await html2canvas(pages[i], {
-      scale: 2,
-      backgroundColor: "#ffffff"
-    });
+    const canvas = await html2canvas(pages[i], { scale: 2 });
 
     if (i > 0) pdf.addPage();
     pdf.addImage(
