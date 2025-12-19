@@ -20,7 +20,7 @@
   --border:#e0e0e0;
   --bg:#f4f6f8;
   --shadow:0 10px 22px rgba(0,0,0,.1);
-  --shadow-hover:0 12px 26px rgba(0,0,0,.18);
+  --shadow-hover:0 12px 26px rgba(0,0,0,.16);
 }
 
 body {
@@ -29,7 +29,7 @@ body {
   background:var(--bg);
 }
 
-/* HEADER */
+/* ---------- HEADER ---------- */
 .header {
   position:fixed;
   top:0;
@@ -61,7 +61,7 @@ body {
   font-weight:600;
 }
 
-/* TOP BAR */
+/* ---------- TOP BAR ---------- */
 .top-bar {
   position:fixed;
   top:0;
@@ -94,7 +94,7 @@ body {
   border:none;
 }
 
-/* MAIN */
+/* ---------- MAIN ---------- */
 .main {
   padding:110px 20px 40px;
   display:flex;
@@ -102,7 +102,7 @@ body {
   align-items:center;
 }
 
-/* DROP ZONE */
+/* ---------- DROP ZONE (MATCHED STYLING) ---------- */
 .drop-zone {
   max-width:620px;
   width:100%;
@@ -122,7 +122,12 @@ body {
   transform:translateY(-2px);
 }
 
-/* PAGES */
+.drop-zone i {
+  font-size:36px;
+  color:var(--accent);
+}
+
+/* ---------- PAGES ---------- */
 #pages {
   display:flex;
   flex-direction:column;
@@ -136,10 +141,10 @@ body {
 }
 
 /* LANDSCAPE ONLY */
-.page.a4 { width:297mm; height:210mm; }
-.page.a3 { width:420mm; height:297mm; }
+.page.a4 { width:297mm;height:210mm; }
+.page.a3 { width:420mm;height:297mm; }
 
-/* CELL */
+/* ---------- CELL ---------- */
 .cell {
   position:relative;
   overflow:hidden;
@@ -152,11 +157,11 @@ body {
   object-fit:cover;
 }
 
-/* IMAGE TOOLS (HOVER ONLY) */
+/* ---------- IMAGE TOOLS (HOVER) ---------- */
 .tools {
   position:absolute;
-  top:8px;
-  right:8px;
+  top:6px;
+  right:6px;
   display:flex;
   gap:6px;
   opacity:0;
@@ -174,19 +179,16 @@ body {
   height:28px;
   border-radius:50%;
   border:none;
-  background:rgba(0,0,0,.7);
+  background:rgba(0,0,0,.65);
   color:white;
   cursor:pointer;
-  transition:transform .15s ease;
 }
 
-.tools button:hover {
-  transform:scale(1.1);
+.exporting .tools {
+  display:none !important;
 }
 
-.exporting .tools { display:none; }
-
-/* PROGRESS */
+/* ---------- PROGRESS ---------- */
 .progress-overlay {
   position:fixed;
   inset:0;
@@ -194,6 +196,7 @@ body {
   display:none;
   align-items:center;
   justify-content:center;
+  z-index:2000;
 }
 
 .progress-box {
@@ -202,6 +205,11 @@ body {
   padding:20px;
   border-radius:10px;
   box-shadow:var(--shadow);
+}
+
+.progress-box strong {
+  display:block;
+  margin-bottom:10px;
 }
 
 .progress-bar {
@@ -222,22 +230,17 @@ body {
 
 <body>
 
+<!-- HEADER -->
 <div class="header">
   <div class="logo"><img src="logo.svg"></div>
   <div class="title">Card Sheets</div>
 </div>
 
+<!-- TOP BAR -->
 <div class="top-bar">
   <select id="paperSize">
     <option value="a4">A4</option>
     <option value="a3">A3</option>
-  </select>
-
-  <!-- CARDS ONLY -->
-  <select id="cardMode">
-    <option value="auto-standard" selected>
-      Auto-fit • Standard Game Cards (63 × 88 mm)
-    </option>
   </select>
 
   <button id="backingBtn"></button>
@@ -248,6 +251,7 @@ body {
   </button>
 </div>
 
+<!-- MAIN -->
 <div class="main">
   <div class="drop-zone" id="dropZone">
     <i class="fa-solid fa-cloud-arrow-up"></i>
@@ -257,6 +261,7 @@ body {
   <div id="pages"></div>
 </div>
 
+<!-- PROGRESS -->
 <div class="progress-overlay" id="progressOverlay">
   <div class="progress-box">
     <strong>Generating PDF…</strong>
@@ -289,6 +294,7 @@ let images = [];
 let backingImage = null;
 let dragIndex = null;
 
+/* ---------- UI ---------- */
 function updateBackingButton() {
   backingBtn.innerHTML = backingImage
     ? `<i class="fa-solid fa-trash"></i> Remove backing`
@@ -296,7 +302,7 @@ function updateBackingButton() {
 }
 updateBackingButton();
 
-/* INPUT */
+/* ---------- INPUT ---------- */
 dropZone.onclick = () => fileInput.click();
 fileInput.onchange = e => addImages(e.target.files);
 
@@ -326,7 +332,7 @@ function addImages(files) {
   render();
 }
 
-/* GRID: AUTO-FIT STANDARD CARDS */
+/* ---------- GRID (AUTO-FIT ONLY) ---------- */
 function grid() {
   const page = PAGE[paperSize.value];
   const cols = Math.floor(page.width / CARD.width);
@@ -334,7 +340,7 @@ function grid() {
   return { cols, rows, per: cols * rows };
 }
 
-/* RENDER */
+/* ---------- RENDER ---------- */
 function render() {
   pagesEl.innerHTML = "";
   document.documentElement.style.setProperty(
@@ -394,7 +400,7 @@ function renderPage(srcs, base, cols, rows, backing) {
 function copyImg(i){ images.splice(i+1,0,images[i]); render(); }
 function deleteImg(i){ images.splice(i,1); render(); }
 
-/* PDF EXPORT */
+/* ---------- PDF EXPORT ---------- */
 async function exportPDF() {
   const pages = document.querySelectorAll(".page");
   if (!pages.length) return;
@@ -419,7 +425,7 @@ async function exportPDF() {
       pdf.internal.pageSize.getWidth(),
       pdf.internal.pageSize.getHeight()
     );
-    progressFill.style.width = `${((i+1)/pages.length)*100}%`;
+    progressFill.style.width = `${Math.round(((i+1)/pages.length)*100)}%`;
   }
 
   progressOverlay.style.display = "none";
