@@ -20,7 +20,7 @@
   --border:#e0e0e0;
   --bg:#f4f6f8;
   --shadow:0 10px 22px rgba(0,0,0,.1);
-  --grid-gap:0mm;
+  --shadow-hover:0 12px 26px rgba(0,0,0,.18);
 }
 
 body {
@@ -79,6 +79,13 @@ body {
   border:1px solid var(--border);
   background:white;
   cursor:pointer;
+  transition:transform .15s ease, box-shadow .15s ease;
+}
+
+.top-bar select:hover,
+.top-bar button:hover {
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-hover);
 }
 
 .top-bar button {
@@ -106,6 +113,13 @@ body {
   text-align:center;
   cursor:pointer;
   margin-bottom:30px;
+  transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.drop-zone:hover {
+  border-color:var(--accent);
+  box-shadow:0 0 0 4px rgba(43,108,176,.12);
+  transform:translateY(-2px);
 }
 
 /* PAGES */
@@ -118,7 +132,6 @@ body {
 .page {
   background:white;
   display:grid;
-  gap:0;
   box-shadow:var(--shadow);
 }
 
@@ -139,13 +152,21 @@ body {
   object-fit:cover;
 }
 
-/* TOOLS */
+/* IMAGE TOOLS (HOVER ONLY) */
 .tools {
   position:absolute;
-  top:6px;
-  right:6px;
+  top:8px;
+  right:8px;
   display:flex;
   gap:6px;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .15s ease;
+}
+
+.cell:hover .tools {
+  opacity:1;
+  pointer-events:auto;
 }
 
 .tools button {
@@ -153,9 +174,14 @@ body {
   height:28px;
   border-radius:50%;
   border:none;
-  background:rgba(0,0,0,.65);
+  background:rgba(0,0,0,.7);
   color:white;
   cursor:pointer;
+  transition:transform .15s ease;
+}
+
+.tools button:hover {
+  transform:scale(1.1);
 }
 
 .exporting .tools { display:none; }
@@ -175,6 +201,7 @@ body {
   background:white;
   padding:20px;
   border-radius:10px;
+  box-shadow:var(--shadow);
 }
 
 .progress-bar {
@@ -188,6 +215,7 @@ body {
   height:100%;
   width:0%;
   background:var(--accent);
+  transition:width .25s ease;
 }
 </style>
 </head>
@@ -205,19 +233,19 @@ body {
     <option value="a3">A3</option>
   </select>
 
-  <select id="cardsPerPage">
-    <option value="1">1 card per page</option>
-    <option value="2">2 cards per page</option>
-    <option value="4" selected>4 cards per page</option>
-    <option value="6">6 cards per page</option>
-    <option value="9">9 cards per page</option>
-    <option value="auto-standard">Auto-fit • Standard Cards (63 × 88 mm)</option>
+  <!-- CARDS ONLY -->
+  <select id="cardMode">
+    <option value="auto-standard" selected>
+      Auto-fit • Standard Game Cards (63 × 88 mm)
+    </option>
   </select>
 
   <button id="backingBtn"></button>
   <input type="file" id="backingInput" hidden accept="image/*">
 
-  <button onclick="exportPDF()"><i class="fa-solid fa-file-pdf"></i></button>
+  <button onclick="exportPDF()">
+    <i class="fa-solid fa-file-pdf"></i>
+  </button>
 </div>
 
 <div class="main">
@@ -246,125 +274,157 @@ const dropZone = document.getElementById("dropZone");
 const fileInput = document.getElementById("fileInput");
 const backingBtn = document.getElementById("backingBtn");
 const backingInput = document.getElementById("backingInput");
-
 const progressOverlay = document.getElementById("progressOverlay");
 const progressFill = document.getElementById("progressFill");
 
 const paperSize = document.getElementById("paperSize");
-const cardsPerPage = document.getElementById("cardsPerPage");
 
-const CARD_SIZES = { standard:{width:63,height:88} };
-const PAGE_SIZES = {
-  a4:{width:297,height:210},
-  a3:{width:420,height:297}
+const CARD = { width:63, height:88 }; // mm
+const PAGE = {
+  a4:{ width:297, height:210 },
+  a3:{ width:420, height:297 }
 };
 
-let images=[], backingImage=null;
+let images = [];
+let backingImage = null;
+let dragIndex = null;
 
-function updateBackingButton(){
+function updateBackingButton() {
   backingBtn.innerHTML = backingImage
     ? `<i class="fa-solid fa-trash"></i> Remove backing`
     : `<i class="fa-solid fa-image"></i> Backing`;
 }
 updateBackingButton();
 
-dropZone.onclick=()=>fileInput.click();
-fileInput.onchange=e=>addImages(e.target.files);
-dropZone.ondragover=e=>e.preventDefault();
-dropZone.ondrop=e=>{e.preventDefault();addImages(e.dataTransfer.files);};
+/* INPUT */
+dropZone.onclick = () => fileInput.click();
+fileInput.onchange = e => addImages(e.target.files);
 
-backingBtn.onclick=()=>backingImage?(backingImage=null,updateBackingButton(),render()):backingInput.click();
-backingInput.onchange=e=>{
-  if(!e.target.files[0])return;
-  backingImage=URL.createObjectURL(e.target.files[0]);
-  updateBackingButton(); render();
+dropZone.ondragover = e => e.preventDefault();
+dropZone.ondrop = e => {
+  e.preventDefault();
+  addImages(e.dataTransfer.files);
 };
 
-[paperSize,cardsPerPage].forEach(e=>e.onchange=render);
+backingBtn.onclick = () =>
+  backingImage ? (backingImage=null,updateBackingButton(),render())
+               : backingInput.click();
 
-function addImages(files){
-  [...files].forEach(f=>f.type.startsWith("image/")&&images.push(URL.createObjectURL(f)));
+backingInput.onchange = e => {
+  if (!e.target.files[0]) return;
+  backingImage = URL.createObjectURL(e.target.files[0]);
+  updateBackingButton();
+  render();
+};
+
+paperSize.onchange = render;
+
+function addImages(files) {
+  [...files].forEach(f =>
+    f.type.startsWith("image/") && images.push(URL.createObjectURL(f))
+  );
   render();
 }
 
-function grid(value){
-  if(value==="auto-standard"){
-    const page=PAGE_SIZES[paperSize.value];
-    const card=CARD_SIZES.standard;
-    const cols=Math.floor(page.width/card.width);
-    const rows=Math.floor(page.height/card.height);
-    return {cols,rows,per:cols*rows};
-  }
-  const n=+value;
-  const c=Math.ceil(Math.sqrt(n));
-  return {cols:c,rows:Math.ceil(n/c),per:n};
+/* GRID: AUTO-FIT STANDARD CARDS */
+function grid() {
+  const page = PAGE[paperSize.value];
+  const cols = Math.floor(page.width / CARD.width);
+  const rows = Math.floor(page.height / CARD.height);
+  return { cols, rows, per: cols * rows };
 }
 
-function render(){
-  pagesEl.innerHTML="";
-  const g=grid(cardsPerPage.value);
-  const per=g.per;
+/* RENDER */
+function render() {
+  pagesEl.innerHTML = "";
+  document.documentElement.style.setProperty(
+    "--page-size",
+    paperSize.value.toUpperCase() + " landscape"
+  );
 
-  document.documentElement.style.setProperty("--page-size", paperSize.value.toUpperCase()+" landscape");
+  const g = grid();
 
-  for(let i=0;i<images.length;i+=per){
-    renderPage(images.slice(i,i+per),i,g.cols,g.rows,false);
-    if(backingImage) renderPage(Array(per).fill(backingImage),0,g.cols,g.rows,true);
+  for (let i = 0; i < images.length; i += g.per) {
+    renderPage(images.slice(i, i + g.per), i, g.cols, g.rows, false);
+    if (backingImage)
+      renderPage(Array(g.per).fill(backingImage), 0, g.cols, g.rows, true);
   }
 }
 
-function renderPage(srcs,base,cols,rows,backing){
-  const page=document.createElement("div");
-  page.className=`page ${paperSize.value}`;
-  page.style.gridTemplateColumns=`repeat(${cols},1fr)`;
-  page.style.gridTemplateRows=`repeat(${rows},1fr)`;
+function renderPage(srcs, base, cols, rows, backing) {
+  const page = document.createElement("div");
+  page.className = `page ${paperSize.value}`;
+  page.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+  page.style.gridTemplateRows = `repeat(${rows},1fr)`;
 
-  srcs.forEach((src,idx)=>{
-    const i=base+idx;
-    const cell=document.createElement("div");
-    cell.className="cell";
-    const img=document.createElement("img");
-    img.src=src;
+  srcs.forEach((src, idx) => {
+    const i = base + idx;
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.draggable = !backing;
+
+    const img = document.createElement("img");
+    img.src = src;
     cell.appendChild(img);
 
-    if(!backing){
-      const tools=document.createElement("div");
-      tools.className="tools";
-      tools.innerHTML=`
+    if (!backing) {
+      const tools = document.createElement("div");
+      tools.className = "tools";
+      tools.innerHTML = `
         <button onclick="copyImg(${i})"><i class="fa-solid fa-copy"></i></button>
-        <button onclick="deleteImg(${i})"><i class="fa-solid fa-trash"></i></button>`;
+        <button onclick="deleteImg(${i})"><i class="fa-solid fa-trash"></i></button>
+      `;
       cell.appendChild(tools);
+
+      cell.ondragstart = () => dragIndex = i;
+      cell.ondragover = e => e.preventDefault();
+      cell.ondrop = () => {
+        const moved = images.splice(dragIndex, 1)[0];
+        images.splice(i, 0, moved);
+        render();
+      };
     }
+
     page.appendChild(cell);
   });
+
   pagesEl.appendChild(page);
 }
 
-function copyImg(i){images.splice(i+1,0,images[i]);render();}
-function deleteImg(i){images.splice(i,1);render();}
+function copyImg(i){ images.splice(i+1,0,images[i]); render(); }
+function deleteImg(i){ images.splice(i,1); render(); }
 
-async function exportPDF(){
-  const pages=document.querySelectorAll(".page");
-  if(!pages.length)return;
+/* PDF EXPORT */
+async function exportPDF() {
+  const pages = document.querySelectorAll(".page");
+  if (!pages.length) return;
 
-  progressOverlay.style.display="flex";
-  progressFill.style.width="0%";
+  progressOverlay.style.display = "flex";
+  progressFill.style.width = "0%";
   document.body.classList.add("exporting");
 
-  const pdf=new jsPDF({orientation:"landscape",unit:"mm",format:paperSize.value});
+  const pdf = new jsPDF({
+    orientation:"landscape",
+    unit:"mm",
+    format:paperSize.value
+  });
 
-  for(let i=0;i<pages.length;i++){
-    const canvas=await html2canvas(pages[i],{scale:2});
-    if(i>0)pdf.addPage();
-    pdf.addImage(canvas.toDataURL("image/jpeg",0.98),"JPEG",0,0,
+  for (let i = 0; i < pages.length; i++) {
+    const canvas = await html2canvas(pages[i], { scale:2 });
+    if (i > 0) pdf.addPage();
+    pdf.addImage(
+      canvas.toDataURL("image/jpeg",0.98),
+      "JPEG",
+      0,0,
       pdf.internal.pageSize.getWidth(),
-      pdf.internal.pageSize.getHeight());
-    progressFill.style.width=`${((i+1)/pages.length)*100}%`;
+      pdf.internal.pageSize.getHeight()
+    );
+    progressFill.style.width = `${((i+1)/pages.length)*100}%`;
   }
 
-  progressOverlay.style.display="none";
+  progressOverlay.style.display = "none";
   document.body.classList.remove("exporting");
-  window.open(pdf.output("bloburl"),"_blank");
+  window.open(pdf.output("bloburl"), "_blank");
 }
 </script>
 
