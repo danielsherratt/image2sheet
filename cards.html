@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Card Sheet Generator</title>
+
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+@page { size: var(--page-size); margin: 0; }
+
+:root {
+  --accent:#2b6cb0;
+  --border:#e0e0e0;
+  --bg:#f4f6f8;
+  --shadow:0 10px 22px rgba(0,0,0,.1);
+  --grid-gap:0mm;
+}
+
+body {
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:var(--bg);
+}
+
+/* HEADER */
+.header {
+  position:fixed;
+  top:0;
+  left:0;
+  padding:16px 20px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  z-index:1000;
+}
+
+.logo {
+  width:42px;
+  height:42px;
+  border-radius:10px;
+  background:var(--accent);
+  display:grid;
+  place-items:center;
+  box-shadow:var(--shadow);
+}
+
+.logo img {
+  width:70%;
+  height:70%;
+}
+
+.title {
+  font-size:20px;
+  font-weight:600;
+}
+
+/* TOP BAR */
+.top-bar {
+  position:fixed;
+  top:0;
+  right:0;
+  padding:16px 20px;
+  display:flex;
+  gap:10px;
+  z-index:1000;
+}
+
+.top-bar select,
+.top-bar button {
+  padding:8px 12px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  background:white;
+  cursor:pointer;
+}
+
+.top-bar button {
+  background:var(--accent);
+  color:white;
+  border:none;
+}
+
+/* MAIN */
+.main {
+  padding:110px 20px 40px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+}
+
+/* DROP ZONE */
+.drop-zone {
+  max-width:620px;
+  width:100%;
+  border:2px dashed var(--border);
+  border-radius:14px;
+  padding:40px;
+  background:white;
+  text-align:center;
+  cursor:pointer;
+  margin-bottom:30px;
+}
+
+/* PAGES */
+#pages {
+  display:flex;
+  flex-direction:column;
+  gap:30px;
+}
+
+.page {
+  background:white;
+  display:grid;
+  gap:0;
+  box-shadow:var(--shadow);
+}
+
+/* LANDSCAPE ONLY */
+.page.a4 { width:297mm; height:210mm; }
+.page.a3 { width:420mm; height:297mm; }
+
+/* CELL */
+.cell {
+  position:relative;
+  overflow:hidden;
+  border:1px solid var(--border);
+}
+
+.cell img {
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+/* TOOLS */
+.tools {
+  position:absolute;
+  top:6px;
+  right:6px;
+  display:flex;
+  gap:6px;
+}
+
+.tools button {
+  width:28px;
+  height:28px;
+  border-radius:50%;
+  border:none;
+  background:rgba(0,0,0,.65);
+  color:white;
+  cursor:pointer;
+}
+
+.exporting .tools { display:none; }
+
+/* PROGRESS */
+.progress-overlay {
+  position:fixed;
+  inset:0;
+  background:rgba(255,255,255,.85);
+  display:none;
+  align-items:center;
+  justify-content:center;
+}
+
+.progress-box {
+  width:320px;
+  background:white;
+  padding:20px;
+  border-radius:10px;
+}
+
+.progress-bar {
+  height:8px;
+  background:#eee;
+  border-radius:4px;
+  overflow:hidden;
+}
+
+.progress-fill {
+  height:100%;
+  width:0%;
+  background:var(--accent);
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+  <div class="logo"><img src="logo.svg"></div>
+  <div class="title">Card Sheets</div>
+</div>
+
+<div class="top-bar">
+  <select id="paperSize">
+    <option value="a4">A4</option>
+    <option value="a3">A3</option>
+  </select>
+
+  <select id="cardsPerPage">
+    <option value="1">1 card per page</option>
+    <option value="2">2 cards per page</option>
+    <option value="4" selected>4 cards per page</option>
+    <option value="6">6 cards per page</option>
+    <option value="9">9 cards per page</option>
+    <option value="auto-standard">Auto-fit • Standard Cards (63 × 88 mm)</option>
+  </select>
+
+  <button id="backingBtn"></button>
+  <input type="file" id="backingInput" hidden accept="image/*">
+
+  <button onclick="exportPDF()"><i class="fa-solid fa-file-pdf"></i></button>
+</div>
+
+<div class="main">
+  <div class="drop-zone" id="dropZone">
+    <i class="fa-solid fa-cloud-arrow-up"></i>
+    <p><strong>Drop card images here</strong><br>or click to choose files</p>
+    <input type="file" id="fileInput" hidden multiple accept="image/*">
+  </div>
+  <div id="pages"></div>
+</div>
+
+<div class="progress-overlay" id="progressOverlay">
+  <div class="progress-box">
+    <strong>Generating PDF…</strong>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const { jsPDF } = window.jspdf;
+
+const pagesEl = document.getElementById("pages");
+const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+const backingBtn = document.getElementById("backingBtn");
+const backingInput = document.getElementById("backingInput");
+
+const progressOverlay = document.getElementById("progressOverlay");
+const progressFill = document.getElementById("progressFill");
+
+const paperSize = document.getElementById("paperSize");
+const cardsPerPage = document.getElementById("cardsPerPage");
+
+const CARD_SIZES = { standard:{width:63,height:88} };
+const PAGE_SIZES = {
+  a4:{width:297,height:210},
+  a3:{width:420,height:297}
+};
+
+let images=[], backingImage=null;
+
+function updateBackingButton(){
+  backingBtn.innerHTML = backingImage
+    ? `<i class="fa-solid fa-trash"></i> Remove backing`
+    : `<i class="fa-solid fa-image"></i> Backing`;
+}
+updateBackingButton();
+
+dropZone.onclick=()=>fileInput.click();
+fileInput.onchange=e=>addImages(e.target.files);
+dropZone.ondragover=e=>e.preventDefault();
+dropZone.ondrop=e=>{e.preventDefault();addImages(e.dataTransfer.files);};
+
+backingBtn.onclick=()=>backingImage?(backingImage=null,updateBackingButton(),render()):backingInput.click();
+backingInput.onchange=e=>{
+  if(!e.target.files[0])return;
+  backingImage=URL.createObjectURL(e.target.files[0]);
+  updateBackingButton(); render();
+};
+
+[paperSize,cardsPerPage].forEach(e=>e.onchange=render);
+
+function addImages(files){
+  [...files].forEach(f=>f.type.startsWith("image/")&&images.push(URL.createObjectURL(f)));
+  render();
+}
+
+function grid(value){
+  if(value==="auto-standard"){
+    const page=PAGE_SIZES[paperSize.value];
+    const card=CARD_SIZES.standard;
+    const cols=Math.floor(page.width/card.width);
+    const rows=Math.floor(page.height/card.height);
+    return {cols,rows,per:cols*rows};
+  }
+  const n=+value;
+  const c=Math.ceil(Math.sqrt(n));
+  return {cols:c,rows:Math.ceil(n/c),per:n};
+}
+
+function render(){
+  pagesEl.innerHTML="";
+  const g=grid(cardsPerPage.value);
+  const per=g.per;
+
+  document.documentElement.style.setProperty("--page-size", paperSize.value.toUpperCase()+" landscape");
+
+  for(let i=0;i<images.length;i+=per){
+    renderPage(images.slice(i,i+per),i,g.cols,g.rows,false);
+    if(backingImage) renderPage(Array(per).fill(backingImage),0,g.cols,g.rows,true);
+  }
+}
+
+function renderPage(srcs,base,cols,rows,backing){
+  const page=document.createElement("div");
+  page.className=`page ${paperSize.value}`;
+  page.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+  page.style.gridTemplateRows=`repeat(${rows},1fr)`;
+
+  srcs.forEach((src,idx)=>{
+    const i=base+idx;
+    const cell=document.createElement("div");
+    cell.className="cell";
+    const img=document.createElement("img");
+    img.src=src;
+    cell.appendChild(img);
+
+    if(!backing){
+      const tools=document.createElement("div");
+      tools.className="tools";
+      tools.innerHTML=`
+        <button onclick="copyImg(${i})"><i class="fa-solid fa-copy"></i></button>
+        <button onclick="deleteImg(${i})"><i class="fa-solid fa-trash"></i></button>`;
+      cell.appendChild(tools);
+    }
+    page.appendChild(cell);
+  });
+  pagesEl.appendChild(page);
+}
+
+function copyImg(i){images.splice(i+1,0,images[i]);render();}
+function deleteImg(i){images.splice(i,1);render();}
+
+async function exportPDF(){
+  const pages=document.querySelectorAll(".page");
+  if(!pages.length)return;
+
+  progressOverlay.style.display="flex";
+  progressFill.style.width="0%";
+  document.body.classList.add("exporting");
+
+  const pdf=new jsPDF({orientation:"landscape",unit:"mm",format:paperSize.value});
+
+  for(let i=0;i<pages.length;i++){
+    const canvas=await html2canvas(pages[i],{scale:2});
+    if(i>0)pdf.addPage();
+    pdf.addImage(canvas.toDataURL("image/jpeg",0.98),"JPEG",0,0,
+      pdf.internal.pageSize.getWidth(),
+      pdf.internal.pageSize.getHeight());
+    progressFill.style.width=`${((i+1)/pages.length)*100}%`;
+  }
+
+  progressOverlay.style.display="none";
+  document.body.classList.remove("exporting");
+  window.open(pdf.output("bloburl"),"_blank");
+}
+</script>
+
+</body>
+</html>
