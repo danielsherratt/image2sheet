@@ -2,265 +2,313 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Image2Sheet</title>
 
-<!-- Favicon -->
 <link rel="icon" type="image/svg+xml" href="logo.svg">
-
-<!-- Font Awesome -->
-<link rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
+*, *::before, *::after { box-sizing:border-box; }
 @page { size: var(--page-size); margin: var(--page-margin); }
 
-:root {
+:root{
   --accent:#2b6cb0;
-  --border:#e0e0e0;
   --bg:#f4f6f8;
+  --border:#e0e0e0;
   --shadow:0 10px 22px rgba(0,0,0,.1);
   --shadow-hover:0 12px 26px rgba(0,0,0,.16);
   --page-margin:15mm;
   --grid-gap:10mm;
 }
 
-body {
+body{
   margin:0;
-  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   background:var(--bg);
 }
 
-/* ---------- HEADER ---------- */
-.header {
-  position:fixed;
-  top:0;
-  left:0;
-  padding:16px 20px;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  z-index:1000;
-}
-
-.logo {
-  width:42px;
-  height:42px;
-  border-radius:10px;
-  background:var(--accent);
-  display:grid;
-  place-items:center;
+/* ---------- MAIN CONTAINER ---------- */
+.main{
+  max-width:1000px;
+  margin:80px auto;
+  background:#fff;
+  padding:28px;
+  border-radius:14px;
   box-shadow:var(--shadow);
 }
 
-.logo img {
-  width:70%;
-  height:70%;
+/* ---------- HEADER + MENU ---------- */
+.header{
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  cursor:pointer;
+  user-select:none;
 }
+.header img{ width:36px;height:36px; }
+.header h1{ margin:0;font-size:22px;font-weight:650; }
+.header .chev{ margin-left:auto;color:#666; }
 
-.title {
-  font-size:20px;
-  font-weight:600;
+.menu{
+  position:absolute;
+  top:52px;
+  left:0;
+  min-width:230px;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:10px;
+  box-shadow:var(--shadow);
+  display:none;
+  flex-direction:column;
+  z-index:50;
 }
-
-/* ---------- TOP BAR ---------- */
-.top-bar {
-  position:fixed;
-  top:0;
-  right:0;
-  padding:16px 20px;
+.menu.show{ display:flex; }
+.menu a{
+  padding:12px 14px;
   display:flex;
   gap:10px;
-  z-index:1000;
+  text-decoration:none;
+  color:#111;
 }
+.menu a:hover{ background:#f1f3f5; }
 
-.top-bar select,
-.top-bar button {
-  padding:8px 12px;
-  border-radius:8px;
-  border:1px solid var(--border);
-  background:white;
-  cursor:pointer;
-  transition:transform .15s ease, box-shadow .15s ease;
-}
-
-.top-bar select:hover,
-.top-bar button:hover {
-  transform:translateY(-2px);
-  box-shadow:var(--shadow-hover);
-}
-
-.top-bar button {
-  background:var(--accent);
-  color:white;
-  border:none;
-}
-
-/* ---------- MAIN ---------- */
-.main {
-  padding:110px 20px 40px;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-}
-
-/* ---------- DROP ZONE ---------- */
-.drop-zone {
-  max-width:620px;
+/* ---------- DROP ZONES ---------- */
+.drop{
   width:100%;
   border:2px dashed var(--border);
-  border-radius:14px;
-  padding:40px;
-  background:white;
+  border-radius:12px;
+  padding:28px 18px;
   text-align:center;
   cursor:pointer;
-  margin-bottom:30px;
-  transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+  margin:18px 0;
+  transition:border-color .2s, box-shadow .2s, transform .2s;
 }
-
-.drop-zone:hover {
+.drop:hover{
   border-color:var(--accent);
   box-shadow:0 0 0 4px rgba(43,108,176,.12);
   transform:translateY(-2px);
 }
-
-.drop-zone i {
-  font-size:36px;
+.drop .icon{
+  font-size:30px;
   color:var(--accent);
+  margin-bottom:6px;
+}
+
+/* ---------- CONTROLS ---------- */
+.controls{
+  display:grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap:14px;
+  margin-top:12px;
+}
+.control label{
+  display:block;
+  font-size:13px;
+  color:#444;
+  margin-bottom:6px;
+}
+.control select{
+  width:100%;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  font-size:15px;
+}
+
+/* ---------- ACTIONS ---------- */
+.actions{
+  margin-top:22px;
+}
+.btn{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  padding:10px 14px;
+  border-radius:10px;
+  border:none;
+  background:var(--accent);
+  color:#fff;
+  cursor:pointer;
+  transition:transform .15s, box-shadow .15s;
+}
+.btn:hover{
+  transform:translateY(-2px) scale(.98);
+  box-shadow:var(--shadow-hover);
+}
+
+/* ---------- PAGE PREVIEW AREA ---------- */
+#pages{
+  display:flex;
+  flex-direction:column;
+  align-items:center; /* CENTER PAGES */
+  gap:40px;
+  margin-top:30px;
+  padding:30px;
+  background:#f2f4f7;
+  border-radius:12px;
 }
 
 /* ---------- PAGES ---------- */
-#pages {
-  display:flex;
-  flex-direction:column;
-  gap:30px;
-}
-
-.page {
-  background:white;
+.page{
+  background:#fff;
   display:grid;
   gap:var(--grid-gap);
-  box-shadow:var(--shadow);
+  box-shadow:
+    0 0 0 1px #ddd,
+    0 12px 28px rgba(0,0,0,.15);
 }
 
-.page.a4.portrait { width:210mm;height:297mm; }
-.page.a4.landscape { width:297mm;height:210mm; }
-.page.a3.portrait { width:297mm;height:420mm; }
-.page.a3.landscape { width:420mm;height:297mm; }
+.page.a4.portrait{ width:210mm;height:297mm; }
+.page.a4.landscape{ width:297mm;height:210mm; }
+.page.a3.portrait{ width:297mm;height:420mm; }
+.page.a3.landscape{ width:420mm;height:297mm; }
 
-/* ---------- CELL ---------- */
-.cell {
+/* ---------- CELLS ---------- */
+.cell{
   position:relative;
+  border:1px solid var(--border);
   border-radius:12px;
   overflow:hidden;
-  border:1px solid var(--border);
 }
-
-.cell img {
+.cell img{
   width:100%;
   height:100%;
   object-fit:cover;
 }
 
-/* ---------- IMAGE TOOLS ---------- */
-.tools {
+/* ---------- TOOLS ---------- */
+.tools{
   position:absolute;
   top:6px;
   right:6px;
   display:flex;
   gap:6px;
 }
-
-.tools button {
+.tools button{
   width:28px;
   height:28px;
   border-radius:50%;
   border:none;
   background:rgba(0,0,0,.65);
-  color:white;
+  color:#fff;
   cursor:pointer;
 }
 
-.exporting .tools {
-  display:none !important;
-}
-
-/* ---------- PROGRESS OVERLAY ---------- */
-.progress-overlay {
+/* ---------- PROGRESS ---------- */
+.progress-overlay{
   position:fixed;
   inset:0;
   background:rgba(255,255,255,.85);
   display:none;
   align-items:center;
   justify-content:center;
-  z-index:2000;
+  z-index:1000;
 }
-
-.progress-box {
+.progress-box{
   width:320px;
-  background:white;
-  padding:20px;
-  border-radius:10px;
+  background:#fff;
+  border-radius:12px;
+  padding:18px;
   box-shadow:var(--shadow);
 }
-
-.progress-box strong {
-  display:block;
-  margin-bottom:10px;
-}
-
-.progress-bar {
+.progress-bar{
   height:8px;
   background:#eee;
-  border-radius:4px;
+  border-radius:999px;
   overflow:hidden;
 }
-
-.progress-fill {
+.progress-fill{
   height:100%;
   width:0%;
   background:var(--accent);
-  transition:width .25s ease;
+  transition:width .25s;
 }
 </style>
 </head>
 
 <body>
 
-<!-- HEADER -->
-<div class="header">
-  <div class="logo">
-    <img src="logo.svg" alt="Image2Sheet logo">
-  </div>
-  <div class="title">Image2Sheet</div>
-</div>
-
-<!-- TOP BAR -->
-<div class="top-bar">
-  <select id="paperSize"><option value="a4">A4</option><option value="a3">A3</option></select>
-  <select id="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
-  <select id="cardsPerPage">
-    <option value="1">1</option><option value="2">2</option>
-    <option value="4" selected>4</option><option value="6">6</option><option value="9">9</option>
-  </select>
-  <select id="layoutMode"><option value="gap">Gap</option><option value="fill">Fill</option></select>
-
-  <button id="backingBtn"></button>
-  <input type="file" id="backingInput" accept="image/*" hidden>
-
-  <button onclick="exportPDF()"><i class="fa-solid fa-file-pdf"></i></button>
-</div>
-
-<!-- MAIN -->
 <div class="main">
-  <div class="drop-zone" id="dropZone">
-    <i class="fa-solid fa-cloud-arrow-up"></i>
-    <p><strong>Drop images here</strong><br>or click to choose files</p>
-    <input type="file" id="fileInput" multiple accept="image/*" hidden>
+
+  <!-- HEADER -->
+  <div class="header" id="toolHeader">
+    <img src="logo.svg">
+    <h1>Image2Sheet</h1>
+    <i class="fa-solid fa-chevron-down chev"></i>
+
+    <nav class="menu" id="menu">
+      <a href="index.html"><i class="fa-solid fa-layer-group"></i>Image2Sheet</a>
+      <a href="image2scale.html"><i class="fa-solid fa-up-right-and-down-left-from-center"></i>Image2Scale</a>
+      <a href="cards.html"><i class="fa-solid fa-clone"></i>Playing Cards</a>
+    </nav>
   </div>
+
+  <!-- FRONT DROP -->
+  <div class="drop" id="dropZone">
+    <div class="icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+    <strong>Drop images here</strong>
+    <div>or click to choose files</div>
+    <input type="file" id="fileInput" hidden multiple accept="image/*">
+  </div>
+
+  <!-- BACKING DROP -->
+  <div class="drop" id="backDrop">
+    <div class="icon"><i class="fa-regular fa-image"></i></div>
+    <strong>Optional backing image</strong>
+    <div>added as every second page</div>
+    <input type="file" id="backingInput" hidden accept="image/*">
+  </div>
+
+  <!-- CONTROLS -->
+  <div class="controls">
+    <div class="control">
+      <label>Paper</label>
+      <select id="paperSize">
+        <option value="a4">A4</option>
+        <option value="a3">A3</option>
+      </select>
+    </div>
+    <div class="control">
+      <label>Orientation</label>
+      <select id="orientation">
+        <option value="portrait">Portrait</option>
+        <option value="landscape">Landscape</option>
+      </select>
+    </div>
+    <div class="control">
+      <label>Quantity</label>
+      <select id="cardsPerPage">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="4" selected>4</option>
+        <option value="6">6</option>
+        <option value="9">9</option>
+      </select>
+    </div>
+    <div class="control">
+      <label>Layout</label>
+      <select id="layoutMode">
+        <option value="gap">Gap</option>
+        <option value="fill">Fill</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- ACTION -->
+  <div class="actions">
+    <button class="btn" onclick="exportPDF()">
+      <i class="fa-solid fa-file-pdf"></i> PDF
+    </button>
+  </div>
+
+  <!-- PREVIEW -->
   <div id="pages"></div>
+
 </div>
 
 <!-- PROGRESS -->
@@ -278,8 +326,8 @@ const { jsPDF } = window.jspdf;
 
 const pagesEl = document.getElementById("pages");
 const dropZone = document.getElementById("dropZone");
+const backDrop = document.getElementById("backDrop");
 const fileInput = document.getElementById("fileInput");
-const backingBtn = document.getElementById("backingBtn");
 const backingInput = document.getElementById("backingInput");
 
 const progressOverlay = document.getElementById("progressOverlay");
@@ -294,99 +342,79 @@ let images = [];
 let backingImage = null;
 let dragIndex = null;
 
-/* ---------- UI STATE ---------- */
-function updateBackingButton() {
-  backingBtn.innerHTML = backingImage
-    ? `<i class="fa-solid fa-trash"></i> Remove backing`
-    : `<i class="fa-solid fa-image"></i> Backing`;
-}
-updateBackingButton();
-
-/* ---------- INPUT ---------- */
+/* INPUTS */
 dropZone.onclick = () => fileInput.click();
 fileInput.onchange = e => addImages(e.target.files);
-
 dropZone.ondragover = e => e.preventDefault();
-dropZone.ondrop = e => {
-  e.preventDefault();
-  addImages(e.dataTransfer.files);
-};
+dropZone.ondrop = e => { e.preventDefault(); addImages(e.dataTransfer.files); };
 
-backingBtn.onclick = () => {
-  if (backingImage) {
-    backingImage = null;
-    backingInput.value = "";
-    updateBackingButton();
-    render();
-  } else {
-    backingInput.click();
-  }
-};
+backDrop.onclick = () => backingInput.click();
+backDrop.ondragover = e => e.preventDefault();
+backDrop.ondrop = e => handleBacking(e.dataTransfer.files);
+backingInput.onchange = e => handleBacking(e.target.files);
 
-backingInput.onchange = e => {
-  if (!e.target.files[0]) return;
-  backingImage = URL.createObjectURL(e.target.files[0]);
-  updateBackingButton();
-  render();
-};
+[paperSize,orientation,cardsPerPage,layoutMode].forEach(e=>e.onchange=render);
 
-[paperSize,orientation,cardsPerPage,layoutMode].forEach(e => e.onchange = render);
-
-function addImages(files) {
-  [...files].forEach(f => f.type.startsWith("image/") && images.push(URL.createObjectURL(f)));
+function handleBacking(files){
+  const f=[...files].find(x=>x.type.startsWith("image/"));
+  if(!f)return;
+  backingImage = URL.createObjectURL(f);
   render();
 }
 
-function grid(n) {
-  const c = Math.ceil(Math.sqrt(n));
-  return { cols:c, rows:Math.ceil(n/c) };
+function addImages(files){
+  [...files].forEach(f=>f.type.startsWith("image/") && images.push(URL.createObjectURL(f)));
+  render();
 }
 
-/* ---------- RENDER ---------- */
-function render() {
-  pagesEl.innerHTML = "";
-  const per = +cardsPerPage.value;
-  const { cols, rows } = grid(per);
+function grid(n){
+  const c=Math.ceil(Math.sqrt(n));
+  return{cols:c,rows:Math.ceil(n/c)};
+}
 
-  document.documentElement.style.setProperty("--page-size", `${paperSize.value.toUpperCase()} ${orientation.value}`);
-  document.documentElement.style.setProperty("--page-margin", layoutMode.value==="fill"?"0mm":"15mm");
-  document.documentElement.style.setProperty("--grid-gap", layoutMode.value==="fill"?"0mm":"10mm");
+function render(){
+  pagesEl.innerHTML="";
+  const per=+cardsPerPage.value;
+  const {cols,rows}=grid(per);
 
-  for (let i = 0; i < images.length; i += per) {
-    renderFront(images.slice(i, i + per), i, cols, rows);
-    if (backingImage) renderBacking(per, cols, rows);
+  document.documentElement.style.setProperty("--page-size",`${paperSize.value.toUpperCase()} ${orientation.value}`);
+  document.documentElement.style.setProperty("--page-margin",layoutMode.value==="fill"?"0mm":"15mm");
+  document.documentElement.style.setProperty("--grid-gap",layoutMode.value==="fill"?"0mm":"10mm");
+
+  for(let i=0;i<images.length;i+=per){
+    renderFront(images.slice(i,i+per),i,cols,rows);
+    if(backingImage)renderBacking(per,cols,rows);
   }
 }
 
-function renderFront(srcs, base, cols, rows) {
-  const page = document.createElement("div");
-  page.className = `page ${paperSize.value} ${orientation.value}`;
-  page.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-  page.style.gridTemplateRows = `repeat(${rows},1fr)`;
+function renderFront(srcs,base,cols,rows){
+  const page=document.createElement("div");
+  page.className=`page ${paperSize.value} ${orientation.value}`;
+  page.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+  page.style.gridTemplateRows=`repeat(${rows},1fr)`;
 
-  srcs.forEach((src, idx) => {
-    const i = base + idx;
-    const cell = document.createElement("div");
-    cell.className = "cell";
-    cell.draggable = true;
-    cell.dataset.index = i;
+  srcs.forEach((src,idx)=>{
+    const i=base+idx;
+    const cell=document.createElement("div");
+    cell.className="cell";
+    cell.draggable=true;
 
-    const img = document.createElement("img");
-    img.src = src;
+    const img=document.createElement("img");
+    img.src=src;
 
-    const tools = document.createElement("div");
-    tools.className = "tools";
-    tools.innerHTML = `
+    const tools=document.createElement("div");
+    tools.className="tools";
+    tools.innerHTML=`
       <button onclick="copyImg(${i})"><i class="fa-solid fa-copy"></i></button>
       <button onclick="deleteImg(${i})"><i class="fa-solid fa-trash"></i></button>
     `;
 
-    cell.append(img, tools);
-    cell.ondragstart = () => dragIndex = i;
-    cell.ondragover = e => e.preventDefault();
-    cell.ondrop = () => {
-      const moved = images.splice(dragIndex, 1)[0];
-      images.splice(i, 0, moved);
+    cell.append(img,tools);
+    cell.ondragstart=()=>dragIndex=i;
+    cell.ondragover=e=>e.preventDefault();
+    cell.ondrop=()=>{
+      const moved=images.splice(dragIndex,1)[0];
+      images.splice(i,0,moved);
       render();
     };
 
@@ -396,17 +424,17 @@ function renderFront(srcs, base, cols, rows) {
   pagesEl.appendChild(page);
 }
 
-function renderBacking(per, cols, rows) {
-  const page = document.createElement("div");
-  page.className = `page ${paperSize.value} ${orientation.value}`;
-  page.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-  page.style.gridTemplateRows = `repeat(${rows},1fr)`;
+function renderBacking(per,cols,rows){
+  const page=document.createElement("div");
+  page.className=`page ${paperSize.value} ${orientation.value}`;
+  page.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+  page.style.gridTemplateRows=`repeat(${rows},1fr)`;
 
-  Array(per).fill(backingImage).forEach(src => {
-    const cell = document.createElement("div");
-    cell.className = "cell";
-    const img = document.createElement("img");
-    img.src = src;
+  Array(per).fill(backingImage).forEach(src=>{
+    const cell=document.createElement("div");
+    cell.className="cell";
+    const img=document.createElement("img");
+    img.src=src;
     cell.appendChild(img);
     page.appendChild(cell);
   });
@@ -414,48 +442,47 @@ function renderBacking(per, cols, rows) {
   pagesEl.appendChild(page);
 }
 
-function copyImg(i) { images.splice(i + 1, 0, images[i]); render(); }
-function deleteImg(i) { images.splice(i, 1); render(); }
+function copyImg(i){ images.splice(i+1,0,images[i]); render(); }
+function deleteImg(i){ images.splice(i,1); render(); }
 
-/* ---------- PDF EXPORT (WITH PROGRESS) ---------- */
-async function exportPDF() {
-  const pages = document.querySelectorAll(".page");
-  if (!pages.length) return;
+async function exportPDF(){
+  const pages=document.querySelectorAll(".page");
+  if(!pages.length)return;
 
-  progressOverlay.style.display = "flex";
-  progressFill.style.width = "0%";
-  document.body.classList.add("exporting");
+  progressOverlay.style.display="flex";
+  progressFill.style.width="0%";
 
-  const pdf = new jsPDF({
-    orientation: orientation.value,
-    unit: "mm",
-    format: paperSize.value
+  const pdf=new jsPDF({
+    orientation:orientation.value,
+    unit:"mm",
+    format:paperSize.value
   });
 
-  for (let i = 0; i < pages.length; i++) {
-    const canvas = await html2canvas(pages[i], {
-      scale: 2,
-      backgroundColor: "#ffffff"
-    });
-
-    if (i > 0) pdf.addPage();
+  for(let i=0;i<pages.length;i++){
+    const canvas=await html2canvas(pages[i],{scale:2,backgroundColor:"#fff"});
+    if(i>0)pdf.addPage();
     pdf.addImage(
-      canvas.toDataURL("image/jpeg", 0.98),
+      canvas.toDataURL("image/jpeg",0.98),
       "JPEG",
-      0,
-      0,
+      0,0,
       pdf.internal.pageSize.getWidth(),
       pdf.internal.pageSize.getHeight()
     );
-
-    progressFill.style.width = `${Math.round(((i + 1) / pages.length) * 100)}%`;
+    progressFill.style.width=`${Math.round(((i+1)/pages.length)*100)}%`;
   }
 
-  progressOverlay.style.display = "none";
-  document.body.classList.remove("exporting");
-
-  window.open(pdf.output("bloburl"), "_blank");
+  progressOverlay.style.display="none";
+  window.open(pdf.output("bloburl"),"_blank");
 }
+
+/* MENU */
+const menu=document.getElementById("menu");
+document.getElementById("toolHeader").onclick=e=>{
+  if(!e.target.closest("a"))menu.classList.toggle("show");
+};
+document.onclick=e=>{
+  if(!e.target.closest(".header"))menu.classList.remove("show");
+};
 </script>
 
 </body>
