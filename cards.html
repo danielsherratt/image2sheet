@@ -2,437 +2,81 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Card Sheet Generator</title>
-
+<title>Playing Cards</title>
 <link rel="icon" type="image/svg+xml" href="logo.svg">
-
 <link rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+ href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 
 <style>
-@page { size: var(--page-size); margin: 0; }
-
 :root {
   --accent:#2b6cb0;
-  --border:#e0e0e0;
   --bg:#f4f6f8;
+  --border:#e0e0e0;
   --shadow:0 10px 22px rgba(0,0,0,.1);
-  --shadow-hover:0 12px 26px rgba(0,0,0,.16);
 }
-
 body {
   margin:0;
-  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  font-family:system-ui;
   background:var(--bg);
 }
-
-/* ---------- HEADER ---------- */
-.header {
-  position:fixed;
-  top:0;
-  left:0;
-  padding:16px 20px;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  z-index:1000;
-}
-
-.logo {
-  width:42px;
-  height:42px;
-  border-radius:10px;
-  background:var(--accent);
-  display:grid;
-  place-items:center;
-  box-shadow:var(--shadow);
-}
-
-.logo img {
-  width:70%;
-  height:70%;
-}
-
-.title {
-  font-size:20px;
-  font-weight:600;
-}
-
-/* ---------- TOP BAR ---------- */
-.top-bar {
-  position:fixed;
-  top:0;
-  right:0;
-  padding:16px 20px;
-  display:flex;
-  gap:10px;
-  z-index:1000;
-}
-
-.top-bar select,
-.top-bar button {
-  padding:8px 12px;
-  border-radius:8px;
-  border:1px solid var(--border);
-  background:white;
-  cursor:pointer;
-  transition:transform .15s ease, box-shadow .15s ease;
-}
-
-.top-bar select:hover,
-.top-bar button:hover {
-  transform:translateY(-2px);
-  box-shadow:var(--shadow-hover);
-}
-
-.top-bar button {
-  background:var(--accent);
-  color:white;
-  border:none;
-}
-
-/* ---------- MAIN ---------- */
 .main {
-  padding:110px 20px 40px;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-}
-
-/* ---------- DROP ZONE (MATCHED STYLING) ---------- */
-.drop-zone {
-  max-width:620px;
-  width:100%;
-  border:2px dashed var(--border);
+  max-width:760px;
+  margin:80px auto;
+  background:white;
+  padding:30px;
   border-radius:14px;
-  padding:40px;
-  background:white;
-  text-align:center;
-  cursor:pointer;
-  margin-bottom:30px;
-  transition:border-color .2s ease, box-shadow .2s ease, transform .2s ease;
-}
-
-.drop-zone:hover {
-  border-color:var(--accent);
-  box-shadow:0 0 0 4px rgba(43,108,176,.12);
-  transform:translateY(-2px);
-}
-
-.drop-zone i {
-  font-size:36px;
-  color:var(--accent);
-}
-
-/* ---------- PAGES ---------- */
-#pages {
-  display:flex;
-  flex-direction:column;
-  gap:30px;
-}
-
-.page {
-  background:white;
-  display:grid;
   box-shadow:var(--shadow);
 }
-
-/* LANDSCAPE ONLY */
-.page.a4 { width:297mm;height:210mm; }
-.page.a3 { width:420mm;height:297mm; }
-
-/* ---------- CELL ---------- */
-.cell {
+.header {
   position:relative;
-  overflow:hidden;
-  border:1px solid var(--border);
-}
-
-.cell img {
-  width:100%;
-  height:100%;
-  object-fit:cover;
-}
-
-/* ---------- IMAGE TOOLS (HOVER) ---------- */
-.tools {
-  position:absolute;
-  top:6px;
-  right:6px;
   display:flex;
-  gap:6px;
-  opacity:0;
-  pointer-events:none;
-  transition:opacity .15s ease;
-}
-
-.cell:hover .tools {
-  opacity:1;
-  pointer-events:auto;
-}
-
-.tools button {
-  width:28px;
-  height:28px;
-  border-radius:50%;
-  border:none;
-  background:rgba(0,0,0,.65);
-  color:white;
+  align-items:center;
+  gap:10px;
   cursor:pointer;
 }
-
-.exporting .tools {
-  display:none !important;
-}
-
-/* ---------- PROGRESS ---------- */
-.progress-overlay {
-  position:fixed;
-  inset:0;
-  background:rgba(255,255,255,.85);
-  display:none;
-  align-items:center;
-  justify-content:center;
-  z-index:2000;
-}
-
-.progress-box {
-  width:320px;
+.header img { width:36px; }
+.header h1 { margin:0;font-size:22px; }
+.header i { margin-left:auto; }
+.menu {
+  position:absolute;
+  top:52px;
+  left:0;
   background:white;
-  padding:20px;
+  border:1px solid var(--border);
   border-radius:10px;
   box-shadow:var(--shadow);
+  display:none;
+  flex-direction:column;
 }
-
-.progress-box strong {
-  display:block;
-  margin-bottom:10px;
+.menu a {
+  padding:12px 14px;
+  text-decoration:none;
+  color:#000;
 }
-
-.progress-bar {
-  height:8px;
-  background:#eee;
-  border-radius:4px;
-  overflow:hidden;
-}
-
-.progress-fill {
-  height:100%;
-  width:0%;
-  background:var(--accent);
-  transition:width .25s ease;
-}
+.menu a:hover { background:#f1f3f5; }
+.menu.show { display:flex; }
 </style>
 </head>
 
 <body>
-
-<!-- HEADER -->
-<div class="header">
-  <div class="logo"><img src="logo.svg"></div>
-  <div class="title">Card Sheets</div>
-</div>
-
-<!-- TOP BAR -->
-<div class="top-bar">
-  <select id="paperSize">
-    <option value="a4">A4</option>
-    <option value="a3">A3</option>
-  </select>
-
-  <button id="backingBtn"></button>
-  <input type="file" id="backingInput" hidden accept="image/*">
-
-  <button onclick="exportPDF()">
-    <i class="fa-solid fa-file-pdf"></i>
-  </button>
-</div>
-
-<!-- MAIN -->
 <div class="main">
-  <div class="drop-zone" id="dropZone">
-    <i class="fa-solid fa-cloud-arrow-up"></i>
-    <p><strong>Drop card images here</strong><br>or click to choose files</p>
-    <input type="file" id="fileInput" hidden multiple accept="image/*">
-  </div>
-  <div id="pages"></div>
-</div>
 
-<!-- PROGRESS -->
-<div class="progress-overlay" id="progressOverlay">
-  <div class="progress-box">
-    <strong>Generating PDF…</strong>
-    <div class="progress-bar">
-      <div class="progress-fill" id="progressFill"></div>
+  <div class="header" onclick="menu.classList.toggle('show')">
+    <img src="logo.svg">
+    <h1>Playing Cards</h1>
+    <i class="fa-solid fa-chevron-down"></i>
+
+    <div class="menu" id="menu">
+      <a href="image2sheet.html">Image2Sheet</a>
+      <a href="image2scale.html">Image2Scale</a>
+      <a href="cards.html">Playing cards</a>
     </div>
   </div>
+
+  <p>
+    This tool will focus on card-sized layouts, bleed, backs, and print-ready decks.
+  </p>
+
 </div>
-
-<script>
-const { jsPDF } = window.jspdf;
-
-const pagesEl = document.getElementById("pages");
-const dropZone = document.getElementById("dropZone");
-const fileInput = document.getElementById("fileInput");
-const backingBtn = document.getElementById("backingBtn");
-const backingInput = document.getElementById("backingInput");
-const progressOverlay = document.getElementById("progressOverlay");
-const progressFill = document.getElementById("progressFill");
-
-const paperSize = document.getElementById("paperSize");
-
-const CARD = { width:63, height:88 }; // mm
-const PAGE = {
-  a4:{ width:297, height:210 },
-  a3:{ width:420, height:297 }
-};
-
-let images = [];
-let backingImage = null;
-let dragIndex = null;
-
-/* ---------- UI ---------- */
-function updateBackingButton() {
-  backingBtn.innerHTML = backingImage
-    ? `<i class="fa-solid fa-trash"></i> Remove backing`
-    : `<i class="fa-solid fa-image"></i> Backing`;
-}
-updateBackingButton();
-
-/* ---------- INPUT ---------- */
-dropZone.onclick = () => fileInput.click();
-fileInput.onchange = e => addImages(e.target.files);
-
-dropZone.ondragover = e => e.preventDefault();
-dropZone.ondrop = e => {
-  e.preventDefault();
-  addImages(e.dataTransfer.files);
-};
-
-backingBtn.onclick = () =>
-  backingImage ? (backingImage=null,updateBackingButton(),render())
-               : backingInput.click();
-
-backingInput.onchange = e => {
-  if (!e.target.files[0]) return;
-  backingImage = URL.createObjectURL(e.target.files[0]);
-  updateBackingButton();
-  render();
-};
-
-paperSize.onchange = render;
-
-function addImages(files) {
-  [...files].forEach(f =>
-    f.type.startsWith("image/") && images.push(URL.createObjectURL(f))
-  );
-  render();
-}
-
-/* ---------- GRID (AUTO-FIT ONLY) ---------- */
-function grid() {
-  const page = PAGE[paperSize.value];
-  const cols = Math.floor(page.width / CARD.width);
-  const rows = Math.floor(page.height / CARD.height);
-  return { cols, rows, per: cols * rows };
-}
-
-/* ---------- RENDER ---------- */
-function render() {
-  pagesEl.innerHTML = "";
-  document.documentElement.style.setProperty(
-    "--page-size",
-    paperSize.value.toUpperCase() + " landscape"
-  );
-
-  const g = grid();
-
-  for (let i = 0; i < images.length; i += g.per) {
-    renderPage(images.slice(i, i + g.per), i, g.cols, g.rows, false);
-    if (backingImage)
-      renderPage(Array(g.per).fill(backingImage), 0, g.cols, g.rows, true);
-  }
-}
-
-function renderPage(srcs, base, cols, rows, backing) {
-  const page = document.createElement("div");
-  page.className = `page ${paperSize.value}`;
-  page.style.gridTemplateColumns = `repeat(${cols},1fr)`;
-  page.style.gridTemplateRows = `repeat(${rows},1fr)`;
-
-  srcs.forEach((src, idx) => {
-    const i = base + idx;
-    const cell = document.createElement("div");
-    cell.className = "cell";
-    cell.draggable = !backing;
-
-    const img = document.createElement("img");
-    img.src = src;
-    cell.appendChild(img);
-
-    if (!backing) {
-      const tools = document.createElement("div");
-      tools.className = "tools";
-      tools.innerHTML = `
-        <button onclick="copyImg(${i})"><i class="fa-solid fa-copy"></i></button>
-        <button onclick="deleteImg(${i})"><i class="fa-solid fa-trash"></i></button>
-      `;
-      cell.appendChild(tools);
-
-      cell.ondragstart = () => dragIndex = i;
-      cell.ondragover = e => e.preventDefault();
-      cell.ondrop = () => {
-        const moved = images.splice(dragIndex, 1)[0];
-        images.splice(i, 0, moved);
-        render();
-      };
-    }
-
-    page.appendChild(cell);
-  });
-
-  pagesEl.appendChild(page);
-}
-
-function copyImg(i){ images.splice(i+1,0,images[i]); render(); }
-function deleteImg(i){ images.splice(i,1); render(); }
-
-/* ---------- PDF EXPORT ---------- */
-async function exportPDF() {
-  const pages = document.querySelectorAll(".page");
-  if (!pages.length) return;
-
-  progressOverlay.style.display = "flex";
-  progressFill.style.width = "0%";
-  document.body.classList.add("exporting");
-
-  const pdf = new jsPDF({
-    orientation:"landscape",
-    unit:"mm",
-    format:paperSize.value
-  });
-
-  for (let i = 0; i < pages.length; i++) {
-    const canvas = await html2canvas(pages[i], { scale:2 });
-    if (i > 0) pdf.addPage();
-    pdf.addImage(
-      canvas.toDataURL("image/jpeg",0.98),
-      "JPEG",
-      0,0,
-      pdf.internal.pageSize.getWidth(),
-      pdf.internal.pageSize.getHeight()
-    );
-    progressFill.style.width = `${Math.round(((i+1)/pages.length)*100)}%`;
-  }
-
-  progressOverlay.style.display = "none";
-  document.body.classList.remove("exporting");
-  window.open(pdf.output("bloburl"), "_blank");
-}
-</script>
-
 </body>
 </html>
