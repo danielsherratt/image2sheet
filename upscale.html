@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Upscale</title>
+
+<link rel="icon" type="image/svg+xml" href="logo.svg">
+
+<link rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+:root {
+  --accent:#2b6cb0;
+  --bg:#f4f6f8;
+  --border:#e0e0e0;
+  --shadow:0 10px 22px rgba(0,0,0,.1);
+}
+
+body {
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:var(--bg);
+}
+
+.main {
+  max-width:700px;
+  margin:80px auto;
+  background:white;
+  padding:30px;
+  border-radius:14px;
+  box-shadow:var(--shadow);
+}
+
+h1 {
+  margin-top:0;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.controls {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:15px;
+  margin:20px 0;
+}
+
+select, button {
+  padding:10px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  font-size:15px;
+}
+
+button {
+  background:var(--accent);
+  color:white;
+  border:none;
+  cursor:pointer;
+}
+
+.drop {
+  border:2px dashed var(--border);
+  border-radius:12px;
+  padding:30px;
+  text-align:center;
+  cursor:pointer;
+}
+
+.drop:hover {
+  border-color:var(--accent);
+}
+
+.note {
+  font-size:14px;
+  color:#555;
+}
+</style>
+</head>
+
+<body>
+
+<div class="main">
+
+  <h1>
+    <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+    Upscale
+  </h1>
+
+  <div class="drop" id="drop">
+    <i class="fa-solid fa-image"></i>
+    <p><strong>Drop one image</strong> or click to choose</p>
+    <input type="file" id="file" accept="image/*" hidden>
+  </div>
+
+  <div class="controls">
+    <div>
+      <label>Current size</label>
+      <select id="from">
+        <option>A4</option>
+        <option>A3</option>
+        <option>A2</option>
+        <option>A1</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Target size</label>
+      <select id="to">
+        <option>A4</option>
+        <option>A3</option>
+        <option>A2</option>
+        <option>A1</option>
+      </select>
+    </div>
+  </div>
+
+  <button onclick="exportPDF()">
+    <i class="fa-solid fa-file-pdf"></i>
+    Export tiled PDF
+  </button>
+
+  <p class="note">
+    The image is split across pages to maintain correct scale.
+    Print at 100%.
+  </p>
+
+</div>
+
+<script>
+const { jsPDF } = window.jspdf;
+const sizes = { A4:1, A3:2, A2:4, A1:8 };
+
+let imgURL = null;
+const drop = document.getElementById("drop");
+const fileInput = document.getElementById("file");
+
+drop.onclick = () => fileInput.click();
+fileInput.onchange = e => loadImage(e.target.files[0]);
+drop.ondragover = e => e.preventDefault();
+drop.ondrop = e => { e.preventDefault(); loadImage(e.dataTransfer.files[0]); };
+
+function loadImage(file) {
+  if (!file) return;
+  imgURL = URL.createObjectURL(file);
+  drop.innerHTML = `<strong>${file.name}</strong>`;
+}
+
+async function exportPDF() {
+  if (!imgURL) return alert("Please add an image");
+
+  const from = document.getElementById("from").value;
+  const to = document.getElementById("to").value;
+
+  const scale = sizes[to] / sizes[from];
+  const tiles = Math.round(Math.sqrt(scale));
+
+  const img = new Image();
+  img.src = imgURL;
+  await img.decode();
+
+  const pdf = new jsPDF({
+    orientation: "portrait",
+    unit: "mm",
+    format: from
+  });
+
+  for (let y=0; y<tiles; y++) {
+    for (let x=0; x<tiles; x++) {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width / tiles;
+      canvas.height = img.height / tiles;
+
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(
+        img,
+        x * canvas.width,
+        y * canvas.height,
+        canvas.width,
+        canvas.height,
+        0,0,canvas.width,canvas.height
+      );
+
+      if (x>0 || y>0) pdf.addPage();
+      pdf.addImage(canvas.toDataURL("image/jpeg",0.95),
+        "JPEG", 0,0,
+        pdf.internal.pageSize.getWidth(),
+        pdf.internal.pageSize.getHeight()
+      );
+    }
+  }
+
+  window.open(pdf.output("bloburl"),"_blank");
+}
+</script>
+
+</body>
+</html>
