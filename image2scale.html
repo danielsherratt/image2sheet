@@ -1,111 +1,342 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Image2Scale</title>
 
-<link rel="icon" type="image/svg+xml" href="logo.svg">
-<link rel="stylesheet"
- href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<link rel="icon" type="image/svg+xml" href="logo.svg" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-*, *::before, *::after { box-sizing:border-box; }
+*, *::before, *::after { box-sizing: border-box; }
 
-:root {
+:root{
   --accent:#2b6cb0;
   --bg:#f4f6f8;
   --border:#e0e0e0;
   --shadow:0 10px 22px rgba(0,0,0,.1);
+  --shadow-hover:0 12px 26px rgba(0,0,0,.16);
 }
 
-body {
+body{
   margin:0;
-  font-family:system-ui;
-  background:var(--bg);
+  font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background: var(--bg);
 }
 
-.main {
-  max-width:760px;
-  margin:80px auto;
-  background:white;
-  padding:30px;
-  border-radius:14px;
-  box-shadow:var(--shadow);
+.main{
+  max-width: 760px;
+  margin: 80px auto;
+  background: #fff;
+  padding: 28px;
+  border-radius: 14px;
+  box-shadow: var(--shadow);
 }
 
-.drop {
+/* ---------- HEADER + MENU ---------- */
+.header{
+  position: relative;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  cursor:pointer;
+  user-select:none;
+}
+.header img{ width:36px; height:36px; }
+.header h1{ margin:0; font-size:22px; font-weight:650; }
+.header .chev{ margin-left:auto; color:#666; }
+
+.menu{
+  position:absolute;
+  top:52px;
+  left:0;
+  min-width: 230px;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+  display:none;
+  flex-direction:column;
+  z-index:50;
+  overflow:hidden;
+}
+.menu.show{ display:flex; }
+.menu a{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:12px 14px;
+  color:#111;
+  text-decoration:none;
+  font-size:15px;
+}
+.menu a:hover{ background:#f1f3f5; }
+.menu a i{ width:18px; text-align:center; color:#333; }
+
+/* ---------- DROP ---------- */
+.drop{
+  width:100%;
   border:2px dashed var(--border);
-  border-radius:12px;
-  padding:30px;
+  border-radius: 12px;
+  padding: 28px 18px;
   text-align:center;
   cursor:pointer;
-  margin:20px 0;
-  transition:.2s;
+  margin: 18px 0;
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+  background:#fff;
+}
+.drop .icon{ font-size: 30px; color: var(--accent); margin-bottom:8px; }
+.drop:hover{
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(43,108,176,.12);
+  transform: translateY(-2px);
 }
 
-.drop:hover {
-  border-color:var(--accent);
-  box-shadow:0 0 0 4px rgba(43,108,176,.12);
-  transform:translateY(-2px);
+.form{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:14px;
+  margin-top: 6px;
 }
 
-label { font-size:14px;color:#444; }
+.field label{
+  display:block;
+  font-size: 13px;
+  color:#444;
+  margin: 0 0 6px;
+}
 
-select {
+.field select{
   width:100%;
-  padding:10px 14px;
-  border-radius:8px;
+  padding:10px 12px;
+  border-radius: 10px;
   border:1px solid var(--border);
+  background:#fff;
+  font-size:15px;
 }
 
-button {
-  margin-top:30px;
-  padding:10px 16px;
-  border-radius:8px;
+/* ---------- BUTTON ---------- */
+.actions{
+  margin-top: 26px; /* more space before export */
+}
+.btn{
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  padding: 10px 14px;
+  border-radius: 10px;
   border:none;
-  background:var(--accent);
-  color:white;
+  background: var(--accent);
+  color:#fff;
   cursor:pointer;
   width:auto;
-  transition:.15s;
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+  font-size: 15px;
+}
+.btn:hover{
+  transform: translateY(-2px) scale(.98);
+  box-shadow: var(--shadow-hover);
+  filter: brightness(1.02);
+}
+.btn:active{
+  transform: translateY(-1px) scale(.99);
+  box-shadow: var(--shadow);
 }
 
-button:hover {
-  transform:translateY(-2px) scale(.98);
-  box-shadow:var(--shadow);
+.hint{
+  margin-top: 10px;
+  color:#555;
+  font-size: 13px;
 }
 </style>
 </head>
 
 <body>
+
 <div class="main">
 
-<h1><i class="fa-solid fa-up-right-and-down-left-from-center"></i> Image2Scale</h1>
+  <!-- HEADER -->
+  <div class="header" id="toolHeader" tabindex="0">
+    <img src="logo.svg" alt="logo" />
+    <h1>Image2Scale</h1>
+    <i class="fa-solid fa-chevron-down chev" aria-hidden="true"></i>
 
-<div class="drop" id="drop">
-  <i class="fa-solid fa-cloud-arrow-up"></i><br>
-  <strong>Drop one image</strong>
-  <input type="file" id="file" hidden accept="image/*">
-</div>
+    <nav class="menu" id="menu">
+      <a href="image2sheet.html"><i class="fa-solid fa-layer-group"></i>Image2Sheet</a>
+      <a href="image2scale.html"><i class="fa-solid fa-up-right-and-down-left-from-center"></i>Image2Scale</a>
+      <a href="cards.html"><i class="fa-solid fa-clone"></i>Playing cards</a>
+    </nav>
+  </div>
 
-<label>Have</label>
-<select id="from">
-  <option>A4</option><option>A3</option><option>A2</option>
-</select>
+  <!-- DROP -->
+  <div class="drop" id="drop">
+    <div class="icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+    <strong>Drop one image</strong>
+    <div class="hint" id="fileHint">or click to choose</div>
+    <input type="file" id="file" hidden accept="image/*" />
+  </div>
 
-<label style="margin-top:15px">Want</label>
-<select id="to">
-  <option>A4</option><option>A3</option><option>A2</option>
-</select>
+  <!-- FORM -->
+  <div class="form">
+    <div class="field">
+      <label for="from">Have</label>
+      <select id="from">
+        <option value="a4" selected>A4</option>
+        <option value="a3">A3</option>
+        <option value="a2">A2</option>
+      </select>
+    </div>
 
-<button onclick="exportPDF()">
-  <i class="fa-solid fa-file-pdf"></i> Export PDF
-</button>
+    <div class="field">
+      <label for="to">Want</label>
+      <select id="to">
+        <option value="a4">A4</option>
+        <option value="a3" selected>A3</option>
+        <option value="a2">A2</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn" id="exportBtn" type="button">
+      <i class="fa-solid fa-file-pdf"></i> PDF
+    </button>
+  </div>
+
+  <div class="hint">
+    Tip: A-series scaling works best when “Want” is larger than “Have” (e.g., A4 → A3).
+  </div>
 
 </div>
 
 <script>
-/* existing working logic goes here */
+const { jsPDF } = window.jspdf;
+
+const menu = document.getElementById("menu");
+const toolHeader = document.getElementById("toolHeader");
+
+function toggleMenu(){ menu.classList.toggle("show"); }
+function closeMenu(){ menu.classList.remove("show"); }
+
+toolHeader.addEventListener("click", (e) => {
+  if (e.target.closest("a")) return;
+  toggleMenu();
+});
+toolHeader.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleMenu(); }
+});
+document.addEventListener("click", (e) => {
+  if (!e.target.closest(".header")) closeMenu();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeMenu();
+});
+
+const drop = document.getElementById("drop");
+const fileInput = document.getElementById("file");
+const fileHint = document.getElementById("fileHint");
+const fromEl = document.getElementById("from");
+const toEl = document.getElementById("to");
+const exportBtn = document.getElementById("exportBtn");
+
+let imageDataURL = null;
+
+function fileToDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+drop.addEventListener("click", () => fileInput.click());
+drop.addEventListener("dragover", (e) => e.preventDefault());
+drop.addEventListener("drop", async (e) => {
+  e.preventDefault();
+  const f = [...e.dataTransfer.files].find(x => x.type.startsWith("image/"));
+  if (!f) return;
+  imageDataURL = await fileToDataURL(f);
+  fileHint.textContent = "image loaded — click to replace";
+});
+
+fileInput.addEventListener("change", async (e) => {
+  const f = [...e.target.files].find(x => x.type.startsWith("image/"));
+  if (!f) return;
+  imageDataURL = await fileToDataURL(f);
+  fileHint.textContent = "image loaded — click to replace";
+});
+
+const A_INDEX = { a4: 4, a3: 3, a2: 2 };
+
+function tilesFor(from, to) {
+  // A-series: area doubles each step up. A4->A3 => 2, A4->A2 => 4, etc.
+  const df = A_INDEX[from];
+  const dt = A_INDEX[to];
+  const steps = df - dt; // positive means "to is bigger"
+  if (steps <= 0) return 1; // no split if same or shrinking
+  return Math.pow(2, steps); // number of A4 pages needed
+}
+
+async function exportPDF() {
+  if (!imageDataURL) {
+    alert("Add an image first.");
+    return;
+  }
+
+  const from = fromEl.value;
+  const to = toEl.value;
+
+  // We split into N tiles of the "from" page size to create the larger "to" output.
+  const tileCount = tilesFor(from, to);
+  const tilesPerSide = Math.sqrt(tileCount);
+
+  if (!Number.isInteger(tilesPerSide)) {
+    alert("This tool expects A-series steps (e.g., A4 → A3 or A4 → A2).");
+    return;
+  }
+
+  const img = new Image();
+  img.src = imageDataURL;
+  await img.decode();
+
+  const pdf = new jsPDF({ unit: "mm", format: from, orientation: "portrait" });
+  const w = pdf.internal.pageSize.getWidth();
+  const h = pdf.internal.pageSize.getHeight();
+
+  // Cut image into a grid of tilesPerSide x tilesPerSide
+  const tileW = Math.floor(img.naturalWidth / tilesPerSide);
+  const tileH = Math.floor(img.naturalHeight / tilesPerSide);
+
+  let pageIndex = 0;
+
+  for (let y = 0; y < tilesPerSide; y++) {
+    for (let x = 0; x < tilesPerSide; x++) {
+      const canvas = document.createElement("canvas");
+      canvas.width = tileW;
+      canvas.height = tileH;
+      const ctx = canvas.getContext("2d");
+
+      ctx.drawImage(
+        img,
+        x * tileW, y * tileH, tileW, tileH,
+        0, 0, tileW, tileH
+      );
+
+      if (pageIndex > 0) pdf.addPage();
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.98), "JPEG", 0, 0, w, h);
+
+      pageIndex++;
+    }
+  }
+
+  window.open(pdf.output("bloburl"), "_blank");
+}
+
+exportBtn.addEventListener("click", exportPDF);
 </script>
+
 </body>
 </html>
