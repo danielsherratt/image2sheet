@@ -72,8 +72,15 @@ body {
   right:0;
   padding:16px 20px;
   display:flex;
-  gap:10px;
+  flex-direction:column;
+  gap:8px;
   z-index:1000;
+}
+
+.top-bar-row {
+  display:flex;
+  gap:10px;
+  align-items:center;
 }
 
 .top-bar select,
@@ -107,7 +114,7 @@ body {
 
 /* ---------- MAIN ---------- */
 .main {
-  padding:110px 20px 40px;
+  padding:130px 20px 40px;
   display:flex;
   flex-direction:column;
   align-items:center;
@@ -194,7 +201,7 @@ body {
   display:none !important;
 }
 
-/* ---------- PROGRESS OVERLAY ---------- */
+/* ---------- PROGRESS ---------- */
 .progress-overlay {
   position:fixed;
   inset:0;
@@ -211,11 +218,6 @@ body {
   padding:20px;
   border-radius:10px;
   box-shadow:var(--shadow);
-}
-
-.progress-box strong {
-  display:block;
-  margin-bottom:10px;
 }
 
 .progress-bar {
@@ -247,24 +249,33 @@ body {
 <!-- TOP BAR -->
 <div class="top-bar">
 
-  <!-- NEW LINK -->
-  <a href="cards.html" title="Playing cards">
-    <i class="fa-solid fa-clone"></i>
-    Playing cards
-  </a>
+  <!-- ROW 1: CONTROLS -->
+  <div class="top-bar-row">
+    <select id="paperSize"><option value="a4">A4</option><option value="a3">A3</option></select>
+    <select id="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
+    <select id="cardsPerPage">
+      <option value="1">1</option>
+      <option value="2">2</option>
+      <option value="4" selected>4</option>
+      <option value="6">6</option>
+      <option value="9">9</option>
+    </select>
+    <select id="layoutMode"><option value="gap">Gap</option><option value="fill">Fill</option></select>
 
-  <select id="paperSize"><option value="a4">A4</option><option value="a3">A3</option></select>
-  <select id="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
-  <select id="cardsPerPage">
-    <option value="1">1</option><option value="2">2</option>
-    <option value="4" selected>4</option><option value="6">6</option><option value="9">9</option>
-  </select>
-  <select id="layoutMode"><option value="gap">Gap</option><option value="fill">Fill</option></select>
+    <button id="backingBtn"></button>
+    <input type="file" id="backingInput" accept="image/*" hidden>
 
-  <button id="backingBtn"></button>
-  <input type="file" id="backingInput" accept="image/*" hidden>
+    <button onclick="exportPDF()"><i class="fa-solid fa-file-pdf"></i></button>
+  </div>
 
-  <button onclick="exportPDF()"><i class="fa-solid fa-file-pdf"></i></button>
+  <!-- ROW 2: NAV -->
+  <div class="top-bar-row">
+    <a href="cards.html">
+      <i class="fa-solid fa-clone"></i>
+      Playing cards
+    </a>
+  </div>
+
 </div>
 
 <!-- MAIN -->
@@ -287,6 +298,149 @@ body {
   </div>
 </div>
 
-<!-- JS unchanged -->
+<script>
+const { jsPDF } = window.jspdf;
+
+const pagesEl = document.getElementById("pages");
+const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+const backingBtn = document.getElementById("backingBtn");
+const backingInput = document.getElementById("backingInput");
+const progressOverlay = document.getElementById("progressOverlay");
+const progressFill = document.getElementById("progressFill");
+
+const paperSize = document.getElementById("paperSize");
+const orientation = document.getElementById("orientation");
+const cardsPerPage = document.getElementById("cardsPerPage");
+const layoutMode = document.getElementById("layoutMode");
+
+let images = [];
+let backingImage = null;
+let dragIndex = null;
+
+function updateBackingButton() {
+  backingBtn.innerHTML = backingImage
+    ? `<i class="fa-solid fa-trash"></i> Remove backing`
+    : `<i class="fa-solid fa-image"></i> Backing`;
+}
+updateBackingButton();
+
+dropZone.onclick = () => fileInput.click();
+fileInput.onchange = e => addImages(e.target.files);
+dropZone.ondragover = e => e.preventDefault();
+dropZone.ondrop = e => { e.preventDefault(); addImages(e.dataTransfer.files); };
+
+backingBtn.onclick = () => backingImage ? (backingImage=null, backingInput.value="", updateBackingButton(), render()) : backingInput.click();
+backingInput.onchange = e => { if (e.target.files[0]) { backingImage = URL.createObjectURL(e.target.files[0]); updateBackingButton(); render(); }};
+
+[paperSize,orientation,cardsPerPage,layoutMode].forEach(e => e.onchange = render);
+
+function addImages(files) {
+  [...files].forEach(f => f.type.startsWith("image/") && images.push(URL.createObjectURL(f)));
+  render();
+}
+
+function grid(n) {
+  const c = Math.ceil(Math.sqrt(n));
+  return { cols:c, rows:Math.ceil(n/c) };
+}
+
+function render() {
+  pagesEl.innerHTML = "";
+  const per = +cardsPerPage.value;
+  const { cols, rows } = grid(per);
+
+  document.documentElement.style.setProperty("--page-size", `${paperSize.value.toUpperCase()} ${orientation.value}`);
+  document.documentElement.style.setProperty("--page-margin", layoutMode.value==="fill"?"0mm":"15mm");
+  document.documentElement.style.setProperty("--grid-gap", layoutMode.value==="fill"?"0mm":"10mm");
+
+  for (let i = 0; i < images.length; i += per) {
+    renderFront(images.slice(i, i + per), i, cols, rows);
+    if (backingImage) renderBacking(per, cols, rows);
+  }
+}
+
+function renderFront(srcs, base, cols, rows) {
+  const page = document.createElement("div");
+  page.className = `page ${paperSize.value} ${orientation.value}`;
+  page.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+  page.style.gridTemplateRows = `repeat(${rows},1fr)`;
+
+  srcs.forEach((src, idx) => {
+    const i = base + idx;
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    cell.draggable = true;
+
+    const img = document.createElement("img");
+    img.src = src;
+
+    const tools = document.createElement("div");
+    tools.className = "tools";
+    tools.innerHTML = `
+      <button onclick="copyImg(${i})"><i class="fa-solid fa-copy"></i></button>
+      <button onclick="deleteImg(${i})"><i class="fa-solid fa-trash"></i></button>
+    `;
+
+    cell.append(img, tools);
+    cell.ondragstart = () => dragIndex = i;
+    cell.ondragover = e => e.preventDefault();
+    cell.ondrop = () => {
+      const moved = images.splice(dragIndex, 1)[0];
+      images.splice(i, 0, moved);
+      render();
+    };
+
+    page.appendChild(cell);
+  });
+
+  pagesEl.appendChild(page);
+}
+
+function renderBacking(per, cols, rows) {
+  const page = document.createElement("div");
+  page.className = `page ${paperSize.value} ${orientation.value}`;
+  page.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+  page.style.gridTemplateRows = `repeat(${rows},1fr)`;
+
+  Array(per).fill(backingImage).forEach(src => {
+    const cell = document.createElement("div");
+    cell.className = "cell";
+    const img = document.createElement("img");
+    img.src = src;
+    cell.appendChild(img);
+    page.appendChild(cell);
+  });
+
+  pagesEl.appendChild(page);
+}
+
+function copyImg(i){ images.splice(i+1,0,images[i]); render(); }
+function deleteImg(i){ images.splice(i,1); render(); }
+
+async function exportPDF() {
+  const pages = document.querySelectorAll(".page");
+  if (!pages.length) return;
+
+  progressOverlay.style.display = "flex";
+  progressFill.style.width = "0%";
+  document.body.classList.add("exporting");
+
+  const pdf = new jsPDF({ orientation: orientation.value, unit: "mm", format: paperSize.value });
+
+  for (let i=0;i<pages.length;i++) {
+    const canvas = await html2canvas(pages[i], { scale:2, backgroundColor:"#fff" });
+    if (i>0) pdf.addPage();
+    pdf.addImage(canvas.toDataURL("image/jpeg",0.98),"JPEG",0,0,
+      pdf.internal.pageSize.getWidth(), pdf.internal.pageSize.getHeight());
+    progressFill.style.width = `${Math.round(((i+1)/pages.length)*100)}%`;
+  }
+
+  progressOverlay.style.display = "none";
+  document.body.classList.remove("exporting");
+  window.open(pdf.output("bloburl"),"_blank");
+}
+</script>
+
 </body>
 </html>
