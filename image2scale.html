@@ -119,7 +119,7 @@ body{
 
 /* ---------- BUTTON ---------- */
 .actions{
-  margin-top: 26px; /* more space before export */
+  margin-top: 26px;
 }
 .btn{
   display:inline-flex;
@@ -143,12 +143,6 @@ body{
 .btn:active{
   transform: translateY(-1px) scale(.99);
   box-shadow: var(--shadow);
-}
-
-.hint{
-  margin-top: 10px;
-  color:#555;
-  font-size: 13px;
 }
 </style>
 </head>
@@ -174,7 +168,7 @@ body{
   <div class="drop" id="drop">
     <div class="icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
     <strong>Drop one image</strong>
-    <div class="hint" id="fileHint">or click to choose</div>
+    <div id="fileHint">or click to choose</div>
     <input type="file" id="file" hidden accept="image/*" />
   </div>
 
@@ -185,16 +179,16 @@ body{
       <select id="from">
         <option value="a4" selected>A4</option>
         <option value="a3">A3</option>
-        <option value="a2">A2</option>
       </select>
     </div>
 
     <div class="field">
       <label for="to">Want</label>
       <select id="to">
-        <option value="a4">A4</option>
         <option value="a3" selected>A3</option>
         <option value="a2">A2</option>
+        <option value="a1">A1</option>
+        <option value="a0">A0</option>
       </select>
     </div>
   </div>
@@ -203,10 +197,6 @@ body{
     <button class="btn" id="exportBtn" type="button">
       <i class="fa-solid fa-file-pdf"></i> PDF
     </button>
-  </div>
-
-  <div class="hint">
-    Tip: A-series scaling works best when “Want” is larger than “Have” (e.g., A4 → A3).
   </div>
 
 </div>
@@ -269,15 +259,14 @@ fileInput.addEventListener("change", async (e) => {
   fileHint.textContent = "image loaded — click to replace";
 });
 
-const A_INDEX = { a4: 4, a3: 3, a2: 2 };
+const A_INDEX = { a4: 4, a3: 3, a2: 2, a1: 1, a0: 0 };
 
 function tilesFor(from, to) {
-  // A-series: area doubles each step up. A4->A3 => 2, A4->A2 => 4, etc.
   const df = A_INDEX[from];
   const dt = A_INDEX[to];
-  const steps = df - dt; // positive means "to is bigger"
-  if (steps <= 0) return 1; // no split if same or shrinking
-  return Math.pow(2, steps); // number of A4 pages needed
+  const steps = df - dt;
+  if (steps <= 0) return 1;
+  return Math.pow(2, steps);
 }
 
 async function exportPDF() {
@@ -289,12 +278,11 @@ async function exportPDF() {
   const from = fromEl.value;
   const to = toEl.value;
 
-  // We split into N tiles of the "from" page size to create the larger "to" output.
   const tileCount = tilesFor(from, to);
   const tilesPerSide = Math.sqrt(tileCount);
 
   if (!Number.isInteger(tilesPerSide)) {
-    alert("This tool expects A-series steps (e.g., A4 → A3 or A4 → A2).");
+    alert("This tool expects A-series steps (e.g., A4 → A3).");
     return;
   }
 
@@ -306,7 +294,6 @@ async function exportPDF() {
   const w = pdf.internal.pageSize.getWidth();
   const h = pdf.internal.pageSize.getHeight();
 
-  // Cut image into a grid of tilesPerSide x tilesPerSide
   const tileW = Math.floor(img.naturalWidth / tilesPerSide);
   const tileH = Math.floor(img.naturalHeight / tilesPerSide);
 
