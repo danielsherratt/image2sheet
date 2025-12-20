@@ -3,22 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <title>Playing Cards</title>
+
 <link rel="icon" type="image/svg+xml" href="logo.svg">
+
 <link rel="stylesheet"
- href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
+@page { size: var(--page-size); margin: 15mm; }
+
 :root {
   --accent:#2b6cb0;
   --bg:#f4f6f8;
   --border:#e0e0e0;
   --shadow:0 10px 22px rgba(0,0,0,.1);
 }
+
 body {
   margin:0;
-  font-family:system-ui;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
   background:var(--bg);
 }
+
+/* ---------- MAIN CARD ---------- */
 .main {
   max-width:760px;
   margin:80px auto;
@@ -27,16 +37,32 @@ body {
   border-radius:14px;
   box-shadow:var(--shadow);
 }
+
+/* ---------- HEADER / TOOL SWITCHER ---------- */
 .header {
   position:relative;
   display:flex;
   align-items:center;
   gap:10px;
   cursor:pointer;
+  user-select:none;
 }
-.header img { width:36px; }
-.header h1 { margin:0;font-size:22px; }
-.header i { margin-left:auto; }
+
+.header img {
+  width:36px;
+  height:36px;
+}
+
+.header h1 {
+  font-size:22px;
+  margin:0;
+}
+
+.header i {
+  margin-left:auto;
+  color:#666;
+}
+
 .menu {
   position:absolute;
   top:52px;
@@ -47,36 +73,266 @@ body {
   box-shadow:var(--shadow);
   display:none;
   flex-direction:column;
+  min-width:220px;
+  z-index:10;
 }
+
 .menu a {
   padding:12px 14px;
   text-decoration:none;
   color:#000;
+  display:flex;
+  gap:10px;
+  align-items:center;
 }
-.menu a:hover { background:#f1f3f5; }
-.menu.show { display:flex; }
+
+.menu a:hover {
+  background:#f1f3f5;
+}
+
+.menu.show {
+  display:flex;
+}
+
+/* ---------- DROP ZONES ---------- */
+.drop {
+  border:2px dashed var(--border);
+  border-radius:12px;
+  padding:30px;
+  text-align:center;
+  cursor:pointer;
+  margin:20px 0;
+}
+
+.drop:hover {
+  border-color:var(--accent);
+}
+
+/* ---------- CONTROLS ---------- */
+.controls {
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:15px;
+  margin:20px 0;
+}
+
+label {
+  font-size:14px;
+  color:#444;
+}
+
+select, button {
+  width:100%;
+  padding:10px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  font-size:15px;
+}
+
+button {
+  background:var(--accent);
+  color:white;
+  border:none;
+  cursor:pointer;
+}
+
+.note {
+  font-size:14px;
+  color:#555;
+  margin-top:15px;
+}
 </style>
 </head>
 
 <body>
+
 <div class="main">
 
-  <div class="header" onclick="menu.classList.toggle('show')">
-    <img src="logo.svg">
+  <!-- HEADER / TOOL MENU -->
+  <div class="header" onclick="toggleMenu()">
+    <img src="logo.svg" alt="logo">
     <h1>Playing Cards</h1>
     <i class="fa-solid fa-chevron-down"></i>
 
     <div class="menu" id="menu">
-      <a href="image2sheet.html">Image2Sheet</a>
-      <a href="image2scale.html">Image2Scale</a>
-      <a href="cards.html">Playing cards</a>
+      <a href="image2sheet.html">
+        <i class="fa-solid fa-layer-group"></i>
+        Image2Sheet
+      </a>
+      <a href="image2scale.html">
+        <i class="fa-solid fa-up-right-and-down-left-from-center"></i>
+        Image2Scale
+      </a>
+      <a href="cards.html">
+        <i class="fa-solid fa-clone"></i>
+        Playing cards
+      </a>
     </div>
   </div>
 
-  <p>
-    This tool will focus on card-sized layouts, bleed, backs, and print-ready decks.
+  <!-- FRONT IMAGES -->
+  <div class="drop" id="frontDrop">
+    <i class="fa-solid fa-clone"></i>
+    <p><strong>Drop card fronts</strong><br>or click to choose</p>
+    <input type="file" id="frontInput" multiple accept="image/*" hidden>
+  </div>
+
+  <!-- BACK IMAGE -->
+  <div class="drop" id="backDrop">
+    <i class="fa-solid fa-image"></i>
+    <p><strong>Optional card back</strong><br>(applied to every second page)</p>
+    <input type="file" id="backInput" accept="image/*" hidden>
+  </div>
+
+  <!-- OPTIONS -->
+  <div class="controls">
+
+    <div>
+      <label>Paper size</label>
+      <select id="paper">
+        <option value="a4">A4</option>
+        <option value="a3">A3</option>
+      </select>
+    </div>
+
+    <div>
+      <label>Cards per page</label>
+      <select id="count">
+        <option value="4">4</option>
+        <option value="6">6</option>
+        <option value="9" selected>9</option>
+        <option value="12">12</option>
+      </select>
+    </div>
+
+  </div>
+
+  <!-- EXPORT -->
+  <button onclick="exportPDF()">
+    <i class="fa-solid fa-file-pdf"></i>
+    Export PDF
+  </button>
+
+  <p class="note">
+    Card backs are added to every second page.  
+    Print at 100% scale.
   </p>
 
 </div>
+
+<script>
+const { jsPDF } = window.jspdf;
+
+const frontDrop = document.getElementById("frontDrop");
+const backDrop = document.getElementById("backDrop");
+const frontInput = document.getElementById("frontInput");
+const backInput = document.getElementById("backInput");
+const menu = document.getElementById("menu");
+
+let fronts = [];
+let backImage = null;
+
+/* ---------- MENU ---------- */
+function toggleMenu() {
+  menu.classList.toggle("show");
+}
+
+document.addEventListener("click", e => {
+  if (!e.target.closest(".header")) menu.classList.remove("show");
+});
+
+/* ---------- INPUTS ---------- */
+frontDrop.onclick = () => frontInput.click();
+backDrop.onclick = () => backInput.click();
+
+frontInput.onchange = e => addFronts(e.target.files);
+backInput.onchange = e => {
+  if (e.target.files[0]) {
+    backImage = URL.createObjectURL(e.target.files[0]);
+    backDrop.innerHTML = `<strong>Back image loaded</strong>`;
+  }
+};
+
+frontDrop.ondragover = backDrop.ondragover = e => e.preventDefault();
+frontDrop.ondrop = e => {
+  e.preventDefault();
+  addFronts(e.dataTransfer.files);
+};
+backDrop.ondrop = e => {
+  e.preventDefault();
+  if (e.dataTransfer.files[0]) {
+    backImage = URL.createObjectURL(e.dataTransfer.files[0]);
+    backDrop.innerHTML = `<strong>Back image loaded</strong>`;
+  }
+};
+
+function addFronts(files) {
+  [...files].forEach(f => {
+    if (f.type.startsWith("image/")) fronts.push(URL.createObjectURL(f));
+  });
+  frontDrop.innerHTML = `<strong>${fronts.length} card fronts loaded</strong>`;
+}
+
+/* ---------- GRID ---------- */
+function grid(n) {
+  const c = Math.ceil(Math.sqrt(n));
+  return { cols:c, rows:Math.ceil(n/c) };
+}
+
+/* ---------- EXPORT ---------- */
+async function exportPDF() {
+  if (!fronts.length) return alert("Add card fronts first");
+
+  const paper = document.getElementById("paper").value;
+  const perPage = +document.getElementById("count").value;
+  const { cols, rows } = grid(perPage);
+
+  const pdf = new jsPDF({
+    orientation:"portrait",
+    unit:"mm",
+    format:paper
+  });
+
+  for (let i=0;i<fronts.length;i+=perPage) {
+
+    // FRONT PAGE
+    const page = document.createElement("div");
+    page.style.display="grid";
+    page.style.gridTemplateColumns=`repeat(${cols},1fr)`;
+    page.style.gridTemplateRows=`repeat(${rows},1fr)`;
+    page.style.width=pdf.internal.pageSize.getWidth()+"mm";
+    page.style.height=pdf.internal.pageSize.getHeight()+"mm";
+
+    fronts.slice(i,i+perPage).forEach(src=>{
+      const img=document.createElement("img");
+      img.src=src;
+      img.style.width="100%";
+      img.style.height="100%";
+      img.style.objectFit="cover";
+      page.appendChild(img);
+    });
+
+    const canvas = await html2canvas(page,{scale:2,backgroundColor:"#fff"});
+    if (i>0) pdf.addPage();
+    pdf.addImage(canvas.toDataURL("image/jpeg",0.95),
+      "JPEG",0,0,
+      pdf.internal.pageSize.getWidth(),
+      pdf.internal.pageSize.getHeight()
+    );
+
+    // BACK PAGE
+    if (backImage) {
+      pdf.addPage();
+      pdf.addImage(backImage,"JPEG",0,0,
+        pdf.internal.pageSize.getWidth(),
+        pdf.internal.pageSize.getHeight()
+      );
+    }
+  }
+
+  window.open(pdf.output("bloburl"),"_blank");
+}
+</script>
+
 </body>
 </html>
