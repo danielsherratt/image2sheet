@@ -3,11 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <title>Image2Scale</title>
+
 <link rel="icon" type="image/svg+xml" href="logo.svg">
-
-<link rel="stylesheet"
- href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
-
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
@@ -20,7 +18,7 @@
 
 body {
   margin:0;
-  font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  font-family:system-ui;
   background:var(--bg);
 }
 
@@ -33,43 +31,6 @@ body {
   box-shadow:var(--shadow);
 }
 
-/* HEADER + MENU (shared) */
-.header {
-  position:relative;
-  display:flex;
-  align-items:center;
-  gap:10px;
-  cursor:pointer;
-}
-
-.header img { width:36px;height:36px; }
-.header h1 { margin:0;font-size:22px; }
-.header i { margin-left:auto;color:#666; }
-
-.menu {
-  position:absolute;
-  top:52px;
-  left:0;
-  background:white;
-  border:1px solid var(--border);
-  border-radius:10px;
-  box-shadow:var(--shadow);
-  display:none;
-  flex-direction:column;
-  min-width:220px;
-}
-
-.menu a {
-  padding:12px 14px;
-  text-decoration:none;
-  color:#000;
-  display:flex;
-  gap:10px;
-}
-
-.menu a:hover { background:#f1f3f5; }
-.menu.show { display:flex; }
-
 .drop {
   border:2px dashed var(--border);
   border-radius:12px;
@@ -77,25 +38,30 @@ body {
   text-align:center;
   cursor:pointer;
   margin:20px 0;
+  transition:border-color .2s, box-shadow .2s, transform .2s;
+}
+.drop:hover {
+  border-color:var(--accent);
+  box-shadow:0 0 0 4px rgba(43,108,176,.12);
+  transform:translateY(-2px);
 }
 
-.controls {
-  display:grid;
-  grid-template-columns:1fr 1fr;
-  gap:15px;
-}
-
+label { font-size:14px;color:#444; }
 select, button {
-  width:100%;
-  padding:10px;
+  padding:10px 14px;
   border-radius:8px;
   border:1px solid var(--border);
 }
-
 button {
   background:var(--accent);
   color:white;
   border:none;
+  width:auto;
+  transition:transform .15s, box-shadow .15s;
+}
+button:hover {
+  transform:translateY(-2px) scale(.98);
+  box-shadow:var(--shadow);
 }
 </style>
 </head>
@@ -103,80 +69,51 @@ button {
 <body>
 <div class="main">
 
-  <!-- HEADER -->
-  <div class="header" onclick="toggleMenu()">
-    <img src="logo.svg">
-    <h1>Image2Scale</h1>
-    <i class="fa-solid fa-chevron-down"></i>
+<h1>Image2Scale</h1>
 
-    <div class="menu" id="menu">
-      <a href="image2sheet.html"><i class="fa-solid fa-layer-group"></i>Image2Sheet</a>
-      <a href="image2scale.html"><i class="fa-solid fa-up-right-and-down-left-from-center"></i>Image2Scale</a>
-      <a href="cards.html"><i class="fa-solid fa-clone"></i>Playing cards</a>
-    </div>
-  </div>
+<div class="drop" id="drop">
+  <strong>Drop one image</strong>
+  <input type="file" id="file" hidden accept="image/*">
+</div>
 
-  <div class="drop" id="drop">
-    <strong>Drop one image</strong><br>or click to choose
-    <input type="file" id="file" accept="image/*" hidden>
-  </div>
+<label>Have</label>
+<select id="from"><option>A4</option><option>A3</option><option>A2</option></select>
 
-  <div class="controls">
-    <select id="from"><option>A4</option><option>A3</option><option>A2</option></select>
-    <select id="to"><option>A4</option><option>A3</option><option>A2</option></select>
-  </div>
+<label>Want</label>
+<select id="to"><option>A4</option><option>A3</option><option>A2</option></select>
 
-  <button onclick="exportPDF()">Export PDF</button>
+<div style="margin-top:30px">
+  <button onclick="exportPDF()">
+    <i class="fa-solid fa-file-pdf"></i> Export PDF
+  </button>
+</div>
 
 </div>
 
 <script>
 const { jsPDF } = window.jspdf;
-const sizes = { A4:1, A3:2, A2:4 };
-
+const sizes={A4:1,A3:2,A2:4};
 let imgURL=null;
-const drop=document.getElementById("drop");
-const file=document.getElementById("file");
-const menu=document.getElementById("menu");
-
-function toggleMenu(){ menu.classList.toggle("show"); }
-document.addEventListener("click",e=>{
-  if(!e.target.closest(".header")) menu.classList.remove("show");
-});
 
 drop.onclick=()=>file.click();
 file.onchange=e=>imgURL=URL.createObjectURL(e.target.files[0]);
 
 async function exportPDF(){
-  if(!imgURL) return alert("Add an image");
-  const from=document.getElementById("from").value;
-  const to=document.getElementById("to").value;
-
-  const scale=sizes[to]/sizes[from];
+  if(!imgURL) return alert("Add image");
+  const scale=sizes[to.value]/sizes[from.value];
   const tiles=Math.sqrt(scale);
+  const img=new Image(); img.src=imgURL; await img.decode();
+  const pdf=new jsPDF({unit:"mm",format:from.value});
 
-  const img=new Image();
-  img.src=imgURL;
-  await img.decode();
-
-  const pdf=new jsPDF({unit:"mm",format:from});
-
-  for(let y=0;y<tiles;y++){
-    for(let x=0;x<tiles;x++){
-      const c=document.createElement("canvas");
-      c.width=img.width/tiles;
-      c.height=img.height/tiles;
-      c.getContext("2d").drawImage(
-        img,
-        x*c.width,y*c.height,c.width,c.height,
-        0,0,c.width,c.height
-      );
-      if(x||y) pdf.addPage();
-      pdf.addImage(c.toDataURL(),"JPEG",0,0,
-        pdf.internal.pageSize.getWidth(),
-        pdf.internal.pageSize.getHeight()
-      );
-    }
+  for(let y=0;y<tiles;y++)for(let x=0;x<tiles;x++){
+    const c=document.createElement("canvas");
+    c.width=img.width/tiles; c.height=img.height/tiles;
+    c.getContext("2d").drawImage(img,
+      x*c.width,y*c.height,c.width,c.height,
+      0,0,c.width,c.height);
+    if(x||y) pdf.addPage();
+    pdf.addImage(c.toDataURL(),"JPEG",0,0,
+      pdf.internal.pageSize.getWidth(),pdf.internal.pageSize.getHeight());
   }
   window.open(pdf.output("bloburl"),"_blank");
 }
