@@ -407,9 +407,50 @@ function waitForImage(img){
 }
 
 const TRIM_COLOR_THRESHOLD=245;
+const TRIM_COLOR_DISTANCE=18;
 
-function isTrimPixel(r,g,b,a){
+function colorDistance(a,b){
+  const dr=a.r-b.r;
+  const dg=a.g-b.g;
+  const db=a.b-b.b;
+  return Math.sqrt(dr*dr+dg*dg+db*db);
+}
+
+function averageColor(colors){
+  const total=colors.reduce((acc,c)=>({r:acc.r+c.r,g:acc.g+c.g,b:acc.b+c.b}),{r:0,g:0,b:0});
+  return {
+    r:Math.round(total.r/colors.length),
+    g:Math.round(total.g/colors.length),
+    b:Math.round(total.b/colors.length)
+  };
+}
+
+function edgeBackgroundColor(data,width,height){
+  const corners=[
+    {x:0,y:0},
+    {x:width-1,y:0},
+    {x:0,y:height-1},
+    {x:width-1,y:height-1}
+  ];
+  const colors=[];
+  for(const {x,y} of corners){
+    const idx=(y*width+x)*4;
+    const a=data[idx+3];
+    if(a===0)continue;
+    colors.push({r:data[idx],g:data[idx+1],b:data[idx+2]});
+  }
+  if(!colors.length)return null;
+  const avg=averageColor(colors);
+  const maxDistance=Math.max(...colors.map(c=>colorDistance(c,avg)));
+  if(maxDistance>TRIM_COLOR_DISTANCE*2)return null;
+  return avg;
+}
+
+function isTrimPixel(r,g,b,a,background){
   if(a===0)return true;
+  if(background){
+    return colorDistance({r,g,b},background)<=TRIM_COLOR_DISTANCE;
+  }
   return r>=TRIM_COLOR_THRESHOLD && g>=TRIM_COLOR_THRESHOLD && b>=TRIM_COLOR_THRESHOLD;
 }
 
@@ -420,12 +461,13 @@ function trimWhitespaceEdges(img){
   canvas.height=img.naturalHeight;
   ctx.drawImage(img,0,0);
   const {data,width,height}=ctx.getImageData(0,0,canvas.width,canvas.height);
+  const background=edgeBackgroundColor(data,width,height);
   let top=height,right=0,bottom=0,left=width;
 
   for(let y=0;y<height;y++){
     for(let x=0;x<width;x++){
       const idx=(y*width+x)*4;
-      if(!isTrimPixel(data[idx],data[idx+1],data[idx+2],data[idx+3])){
+      if(!isTrimPixel(data[idx],data[idx+1],data[idx+2],data[idx+3],background)){
         if(x<left)left=x;
         if(x>right)right=x;
         if(y<top)top=y;
