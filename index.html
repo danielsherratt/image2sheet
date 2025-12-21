@@ -199,6 +199,10 @@ body{
   cursor:pointer;
 }
 
+.exporting .tools{
+  visibility:hidden;
+}
+
 /* ---------- PROGRESS ---------- */
 .progress-overlay{
   position:fixed;
@@ -449,6 +453,7 @@ async function exportPDF(){
   const pages=document.querySelectorAll(".page");
   if(!pages.length)return;
 
+  document.body.classList.add("exporting");
   progressOverlay.style.display="flex";
   progressFill.style.width="0%";
 
@@ -472,6 +477,7 @@ async function exportPDF(){
   }
 
   progressOverlay.style.display="none";
+  document.body.classList.remove("exporting");
   window.open(pdf.output("bloburl"),"_blank");
 }
 
