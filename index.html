@@ -13,7 +13,7 @@
 
 <style>
 *, *::before, *::after { box-sizing:border-box; }
-@page { size: var(--page-size); margin: var(--page-margin); }
+@page { size: var(--page-size); margin: 0; }
 
 :root{
   --accent:#2b6cb0;
@@ -158,6 +158,7 @@ body{
   background:#fff;
   display:grid;
   gap:var(--grid-gap);
+  padding:var(--page-margin);
   box-shadow:
     0 0 0 1px #ddd,
     0 12px 28px rgba(0,0,0,.15);
@@ -457,18 +458,68 @@ function waitForImage(img){
   });
 }
 
-function trimTransparentEdges(img){
+const TRIM_COLOR_THRESHOLD=245;
+const TRIM_COLOR_DISTANCE=18;
+
+function colorDistance(a,b){
+  const dr=a.r-b.r;
+  const dg=a.g-b.g;
+  const db=a.b-b.b;
+  return Math.sqrt(dr*dr+dg*dg+db*db);
+}
+
+function averageColor(colors){
+  const total=colors.reduce((acc,c)=>({r:acc.r+c.r,g:acc.g+c.g,b:acc.b+c.b}),{r:0,g:0,b:0});
+  return {
+    r:Math.round(total.r/colors.length),
+    g:Math.round(total.g/colors.length),
+    b:Math.round(total.b/colors.length)
+  };
+}
+
+function edgeBackgroundColor(data,width,height){
+  const corners=[
+    {x:0,y:0},
+    {x:width-1,y:0},
+    {x:0,y:height-1},
+    {x:width-1,y:height-1}
+  ];
+  const colors=[];
+  for(const {x,y} of corners){
+    const idx=(y*width+x)*4;
+    const a=data[idx+3];
+    if(a===0)continue;
+    colors.push({r:data[idx],g:data[idx+1],b:data[idx+2]});
+  }
+  if(!colors.length)return null;
+  const avg=averageColor(colors);
+  const maxDistance=Math.max(...colors.map(c=>colorDistance(c,avg)));
+  if(maxDistance>TRIM_COLOR_DISTANCE*2)return null;
+  return avg;
+}
+
+function isTrimPixel(r,g,b,a,background){
+  if(a===0)return true;
+  if(background){
+    return colorDistance({r,g,b},background)<=TRIM_COLOR_DISTANCE;
+  }
+  return r>=TRIM_COLOR_THRESHOLD && g>=TRIM_COLOR_THRESHOLD && b>=TRIM_COLOR_THRESHOLD;
+}
+
+function trimWhitespaceEdges(img){
   const canvas=document.createElement("canvas");
   const ctx=canvas.getContext("2d");
   canvas.width=img.naturalWidth;
   canvas.height=img.naturalHeight;
   ctx.drawImage(img,0,0);
   const {data,width,height}=ctx.getImageData(0,0,canvas.width,canvas.height);
+  const background=edgeBackgroundColor(data,width,height);
   let top=height,right=0,bottom=0,left=width;
 
   for(let y=0;y<height;y++){
     for(let x=0;x<width;x++){
-      if(data[(y*width+x)*4+3]!==0){
+      const idx=(y*width+x)*4;
+      if(!isTrimPixel(data[idx],data[idx+1],data[idx+2],data[idx+3],background)){
         if(x<left)left=x;
         if(x>right)right=x;
         if(y<top)top=y;
@@ -491,6 +542,45 @@ function trimTransparentEdges(img){
   return trimmed.toDataURL("image/png");
 }
 
+function cropToCover(img,container){
+  const targetWidth=container?.clientWidth ?? img.naturalWidth;
+  const targetHeight=container?.clientHeight ?? img.naturalHeight;
+  if(!targetWidth || !targetHeight)return img.src;
+
+  const targetRatio=targetWidth/targetHeight;
+  const srcRatio=img.naturalWidth/img.naturalHeight;
+  let cropWidth=img.naturalWidth;
+  let cropHeight=img.naturalHeight;
+  let offsetX=0;
+  let offsetY=0;
+
+  if(srcRatio>targetRatio){
+    cropWidth=Math.round(img.naturalHeight*targetRatio);
+    offsetX=Math.round((img.naturalWidth-cropWidth)/2);
+  }else{
+    cropHeight=Math.round(img.naturalWidth/targetRatio);
+    offsetY=Math.round((img.naturalHeight-cropHeight)/2);
+  }
+
+  const canvas=document.createElement("canvas");
+  canvas.width=cropWidth;
+  canvas.height=cropHeight;
+  canvas
+    .getContext("2d")
+    .drawImage(img,offsetX,offsetY,cropWidth,cropHeight,0,0,cropWidth,cropHeight);
+  return canvas.toDataURL("image/png");
+}
+
+async function buildExportImage(img){
+  const trimmedSrc=trimWhitespaceEdges(img);
+  const tempImg=new Image();
+  tempImg.src=trimmedSrc;
+  await waitForImage(tempImg);
+  if(!tempImg.naturalWidth)return trimmedSrc;
+  const container=img.closest(".cell");
+  return cropToCover(tempImg,container);
+}
+
 async function prepareImagesForExport(){
   const imgEls=[...document.querySelectorAll(".page img")];
   const originals=new Map();
@@ -499,8 +589,11 @@ async function prepareImagesForExport(){
     originals.set(img,img.src);
     await waitForImage(img);
     if(!img.naturalWidth)continue;
-    const trimmedSrc=trimTransparentEdges(img);
-    if(trimmedSrc!==img.src)img.src=trimmedSrc;
+    const exportSrc=await buildExportImage(img);
+    if(exportSrc!==img.src){
+      img.src=exportSrc;
+      await waitForImage(img);
+    }
   }
 
   return ()=>originals.forEach((src,img)=>{ img.src=src; });
