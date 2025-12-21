@@ -490,6 +490,45 @@ function trimWhitespaceEdges(img){
   return trimmed.toDataURL("image/png");
 }
 
+function cropToCover(img,container){
+  const targetWidth=container?.clientWidth ?? img.naturalWidth;
+  const targetHeight=container?.clientHeight ?? img.naturalHeight;
+  if(!targetWidth || !targetHeight)return img.src;
+
+  const targetRatio=targetWidth/targetHeight;
+  const srcRatio=img.naturalWidth/img.naturalHeight;
+  let cropWidth=img.naturalWidth;
+  let cropHeight=img.naturalHeight;
+  let offsetX=0;
+  let offsetY=0;
+
+  if(srcRatio>targetRatio){
+    cropWidth=Math.round(img.naturalHeight*targetRatio);
+    offsetX=Math.round((img.naturalWidth-cropWidth)/2);
+  }else{
+    cropHeight=Math.round(img.naturalWidth/targetRatio);
+    offsetY=Math.round((img.naturalHeight-cropHeight)/2);
+  }
+
+  const canvas=document.createElement("canvas");
+  canvas.width=cropWidth;
+  canvas.height=cropHeight;
+  canvas
+    .getContext("2d")
+    .drawImage(img,offsetX,offsetY,cropWidth,cropHeight,0,0,cropWidth,cropHeight);
+  return canvas.toDataURL("image/png");
+}
+
+async function buildExportImage(img){
+  const trimmedSrc=trimWhitespaceEdges(img);
+  const tempImg=new Image();
+  tempImg.src=trimmedSrc;
+  await waitForImage(tempImg);
+  if(!tempImg.naturalWidth)return trimmedSrc;
+  const container=img.closest(".cell");
+  return cropToCover(tempImg,container);
+}
+
 async function prepareImagesForExport(){
   const imgEls=[...document.querySelectorAll(".page img")];
   const originals=new Map();
@@ -498,9 +537,9 @@ async function prepareImagesForExport(){
     originals.set(img,img.src);
     await waitForImage(img);
     if(!img.naturalWidth)continue;
-    const trimmedSrc=trimWhitespaceEdges(img);
-    if(trimmedSrc!==img.src){
-      img.src=trimmedSrc;
+    const exportSrc=await buildExportImage(img);
+    if(exportSrc!==img.src){
+      img.src=exportSrc;
       await waitForImage(img);
     }
   }
