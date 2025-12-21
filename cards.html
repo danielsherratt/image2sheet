@@ -398,6 +398,74 @@ function renderPage(srcs,base,backing){
 window.copyImg=i=>{ images.splice(i+1,0,images[i]); render(); };
 window.deleteImg=i=>{ images.splice(i,1); render(); };
 
+function waitForImage(img){
+  if(img.complete && img.naturalWidth) return Promise.resolve();
+  return new Promise(resolve=>{
+    img.addEventListener("load",resolve,{once:true});
+    img.addEventListener("error",resolve,{once:true});
+  });
+}
+
+const TRIM_COLOR_THRESHOLD=245;
+
+function isTrimPixel(r,g,b,a){
+  if(a===0)return true;
+  return r>=TRIM_COLOR_THRESHOLD && g>=TRIM_COLOR_THRESHOLD && b>=TRIM_COLOR_THRESHOLD;
+}
+
+function trimWhitespaceEdges(img){
+  const canvas=document.createElement("canvas");
+  const ctx=canvas.getContext("2d");
+  canvas.width=img.naturalWidth;
+  canvas.height=img.naturalHeight;
+  ctx.drawImage(img,0,0);
+  const {data,width,height}=ctx.getImageData(0,0,canvas.width,canvas.height);
+  let top=height,right=0,bottom=0,left=width;
+
+  for(let y=0;y<height;y++){
+    for(let x=0;x<width;x++){
+      const idx=(y*width+x)*4;
+      if(!isTrimPixel(data[idx],data[idx+1],data[idx+2],data[idx+3])){
+        if(x<left)left=x;
+        if(x>right)right=x;
+        if(y<top)top=y;
+        if(y>bottom)bottom=y;
+      }
+    }
+  }
+
+  if(right<left||bottom<top)return img.src;
+  const trimWidth=right-left+1;
+  const trimHeight=bottom-top+1;
+  if(trimWidth===width&&trimHeight===height)return img.src;
+
+  const trimmed=document.createElement("canvas");
+  trimmed.width=trimWidth;
+  trimmed.height=trimHeight;
+  trimmed
+    .getContext("2d")
+    .drawImage(canvas,left,top,trimWidth,trimHeight,0,0,trimWidth,trimHeight);
+  return trimmed.toDataURL("image/png");
+}
+
+async function prepareImagesForExport(){
+  const imgEls=[...document.querySelectorAll(".page img")];
+  const originals=new Map();
+
+  for(const img of imgEls){
+    originals.set(img,img.src);
+    await waitForImage(img);
+    if(!img.naturalWidth)continue;
+    const trimmedSrc=trimWhitespaceEdges(img);
+    if(trimmedSrc!==img.src){
+      img.src=trimmedSrc;
+      await waitForImage(img);
+    }
+  }
+
+  return ()=>originals.forEach((src,img)=>{ img.src=src; });
+}
+
 /* EXPORT */
 exportBtn.onclick = async () => {
   const pages=document.querySelectorAll(".page");
@@ -407,28 +475,34 @@ exportBtn.onclick = async () => {
   progressFill.style.width="0%";
   document.body.classList.add("exporting");
 
-  const pdf=new jsPDF({
-    orientation:"landscape",
-    unit:"mm",
-    format:paperSize.value
-  });
+  const restoreImages=await prepareImagesForExport();
 
-  for(let i=0;i<pages.length;i++){
-    const canvas=await html2canvas(pages[i],{scale:2,backgroundColor:"#fff"});
-    if(i>0)pdf.addPage();
-    pdf.addImage(
-      canvas.toDataURL("image/jpeg",0.98),
-      "JPEG",
-      0,0,
-      pdf.internal.pageSize.getWidth(),
-      pdf.internal.pageSize.getHeight()
-    );
-    progressFill.style.width=`${Math.round(((i+1)/pages.length)*100)}%`;
+  try{
+    const pdf=new jsPDF({
+      orientation:"landscape",
+      unit:"mm",
+      format:paperSize.value
+    });
+
+    for(let i=0;i<pages.length;i++){
+      const canvas=await html2canvas(pages[i],{scale:2,backgroundColor:"#fff"});
+      if(i>0)pdf.addPage();
+      pdf.addImage(
+        canvas.toDataURL("image/jpeg",0.98),
+        "JPEG",
+        0,0,
+        pdf.internal.pageSize.getWidth(),
+        pdf.internal.pageSize.getHeight()
+      );
+      progressFill.style.width=`${Math.round(((i+1)/pages.length)*100)}%`;
+    }
+
+    window.open(pdf.output("bloburl"),"_blank");
+  }finally{
+    restoreImages();
+    progressOverlay.style.display="none";
+    document.body.classList.remove("exporting");
   }
-
-  progressOverlay.style.display="none";
-  document.body.classList.remove("exporting");
-  window.open(pdf.output("bloburl"),"_blank");
 };
 
 /* MENU */

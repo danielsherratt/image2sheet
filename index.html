@@ -458,7 +458,14 @@ function waitForImage(img){
   });
 }
 
-function trimTransparentEdges(img){
+const TRIM_COLOR_THRESHOLD=245;
+
+function isTrimPixel(r,g,b,a){
+  if(a===0)return true;
+  return r>=TRIM_COLOR_THRESHOLD && g>=TRIM_COLOR_THRESHOLD && b>=TRIM_COLOR_THRESHOLD;
+}
+
+function trimWhitespaceEdges(img){
   const canvas=document.createElement("canvas");
   const ctx=canvas.getContext("2d");
   canvas.width=img.naturalWidth;
@@ -469,7 +476,8 @@ function trimTransparentEdges(img){
 
   for(let y=0;y<height;y++){
     for(let x=0;x<width;x++){
-      if(data[(y*width+x)*4+3]!==0){
+      const idx=(y*width+x)*4;
+      if(!isTrimPixel(data[idx],data[idx+1],data[idx+2],data[idx+3])){
         if(x<left)left=x;
         if(x>right)right=x;
         if(y<top)top=y;
@@ -500,8 +508,11 @@ async function prepareImagesForExport(){
     originals.set(img,img.src);
     await waitForImage(img);
     if(!img.naturalWidth)continue;
-    const trimmedSrc=trimTransparentEdges(img);
-    if(trimmedSrc!==img.src)img.src=trimmedSrc;
+    const trimmedSrc=trimWhitespaceEdges(img);
+    if(trimmedSrc!==img.src){
+      img.src=trimmedSrc;
+      await waitForImage(img);
+    }
   }
 
   return ()=>originals.forEach((src,img)=>{ img.src=src; });
