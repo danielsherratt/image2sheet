@@ -1,0 +1,1074 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Image to Direct</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    :root{
+      --accent:#2b6cb0;
+      --bg:#f4f6f8;
+      --border:#e0e0e0;
+      --shadow:0 10px 22px rgba(0,0,0,.10);
+      --shadow-hover:0 12px 26px rgba(0,0,0,.16);
+
+      --pink:#ff3aa6;
+    }
+
+    body{
+      margin:0;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+      background:var(--bg);
+      color:#111;
+    }
+
+    .main{
+      max-width:1000px;
+      margin:80px auto;
+      background:#fff;
+      padding:28px;
+      border-radius:14px;
+      box-shadow:var(--shadow);
+    }
+
+    /* ---------- HEADER + MENU ---------- */
+    .header{
+      position:relative;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      cursor:pointer;
+      user-select:none;
+    }
+    .header .mark{
+      width:36px;height:36px;
+      border-radius:10px;
+      display:grid;
+      place-items:center;
+      background: rgba(43,108,176,.12);
+      color: var(--accent);
+      border: 1px solid rgba(43,108,176,.22);
+    }
+    .header h1{ margin:0;font-size:22px;font-weight:650; }
+    .header .chev{ margin-left:auto;color:#666; }
+
+    .menu{
+      position:absolute;
+      top:52px;
+      left:0;
+      min-width:230px;
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:10px;
+      box-shadow:var(--shadow);
+      display:none;
+      flex-direction:column;
+      z-index:50;
+    }
+    .menu.show{ display:flex; }
+    .menu a{
+      padding:12px 14px;
+      display:flex;
+      gap:10px;
+      text-decoration:none;
+      color:#111;
+      align-items:center;
+    }
+    .menu a:hover{ background:#f1f3f5; }
+
+    /* ---------- LAYOUT ---------- */
+    .grid{
+      display:grid;
+      grid-template-columns: 420px 1fr;
+      gap:18px;
+      margin-top:18px;
+      align-items:start;
+    }
+    @media (max-width: 980px){
+      .grid{ grid-template-columns: 1fr; }
+    }
+
+    /* ---------- DROP ---------- */
+    .drop{
+      width:100%;
+      border:2px dashed var(--border);
+      border-radius:12px;
+      padding:28px 18px;
+      text-align:center;
+      cursor:pointer;
+      transition:border-color .2s, box-shadow .2s, transform .2s, background .2s;
+      user-select:none;
+    }
+    .drop:hover{
+      border-color:var(--accent);
+      box-shadow:0 0 0 4px rgba(43,108,176,.12);
+      transform:translateY(-2px);
+    }
+    .drop.isDrag{
+      border-color: var(--accent);
+      background: rgba(43,108,176,.04);
+      box-shadow:0 0 0 4px rgba(43,108,176,.14);
+    }
+    .drop .icon{
+      font-size:30px;
+      color:var(--accent);
+      margin-bottom:6px;
+    }
+    .drop small{ color:#555; display:block; margin-top:6px; }
+
+    /* ---------- CONTROLS ---------- */
+    .controls{
+      margin-top:14px;
+      display:grid;
+      gap:14px;
+    }
+    .control label{
+      display:block;
+      font-size:13px;
+      color:#444;
+      margin-bottom:6px;
+    }
+    .rangeRow{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    input[type="range"]{ width:100%; }
+    .pill{
+      font-variant-numeric: tabular-nums;
+      padding:6px 10px;
+      border:1px solid var(--border);
+      border-radius:999px;
+      background:#fff;
+      color:#333;
+      min-width:72px;
+      text-align:center;
+    }
+
+    /* ---------- ACTIONS ---------- */
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:8px;
+    }
+    .btn{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      padding:10px 14px;
+      border-radius:10px;
+      border:none;
+      background:var(--accent);
+      color:#fff;
+      cursor:pointer;
+      transition:transform .15s, box-shadow .15s, opacity .15s;
+      box-shadow: var(--shadow);
+      font-weight:650;
+    }
+    .btn:hover{
+      transform:translateY(-2px) scale(.99);
+      box-shadow:var(--shadow-hover);
+    }
+    .btn:disabled{
+      opacity:.55;
+      cursor:not-allowed;
+      transform:none;
+      box-shadow: none;
+    }
+    .btn.secondary{
+      background:#111;
+    }
+    .btn.ghost{
+      background:transparent;
+      color:#111;
+      border:1px solid var(--border);
+      box-shadow:none;
+    }
+
+    /* ---------- PREVIEW ---------- */
+    .previewCard{
+      border:1px solid var(--border);
+      border-radius:12px;
+      overflow:hidden;
+      background:#f2f4f7;
+      min-height: 520px;
+      position:relative;
+    }
+    .stage{
+      position:absolute;
+      inset:0;
+      cursor:grab;
+      touch-action:none;
+      background:
+        linear-gradient(45deg, rgba(0,0,0,.06) 25%, transparent 25%) 0 0/20px 20px,
+        linear-gradient(45deg, transparent 75%, rgba(0,0,0,.06) 75%) 0 0/20px 20px,
+        linear-gradient(45deg, transparent 75%, rgba(0,0,0,.06) 75%) 10px 10px/20px 20px,
+        linear-gradient(45deg, rgba(0,0,0,.06) 25%, transparent 25%) 10px 10px/20px 20px;
+    }
+    .stage:active{ cursor:grabbing; }
+
+    canvas{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      image-rendering: pixelated; /* avoids smoothing on some browsers */
+    }
+
+    .hud{
+      position:absolute;
+      top:10px;
+      right:10px;
+      display:flex;
+      gap:8px;
+      z-index:3;
+      user-select:none;
+    }
+    .chip{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 10px;
+      border-radius:999px;
+      background: rgba(255,255,255,.92);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      font-size:12px;
+      color:#444;
+      backdrop-filter: blur(6px);
+    }
+
+    /* ---------- PROGRESS ---------- */
+    .progress-overlay{
+      position:fixed;
+      inset:0;
+      background:rgba(255,255,255,.85);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index:1000;
+    }
+    .progress-box{
+      width:340px;
+      background:#fff;
+      border-radius:12px;
+      padding:18px;
+      box-shadow:var(--shadow);
+      border:1px solid var(--border);
+    }
+    .progress-title{
+      font-weight:700;
+      margin:0 0 10px 0;
+    }
+    .progress-sub{
+      margin:0 0 12px 0;
+      color:#555;
+      font-size:13px;
+    }
+    .progress-bar{
+      height:8px;
+      background:#eee;
+      border-radius:999px;
+      overflow:hidden;
+    }
+    .progress-fill{
+      height:100%;
+      width:0%;
+      background:var(--accent);
+      transition:width .25s;
+    }
+
+    .hint{
+      font-size:12px;
+      color:#666;
+      margin-top:-6px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="main">
+  <div class="header" id="toolHeader">
+    <img src="logo.svg">
+    <h1>Image2Direct</h1>
+    <i class="fa-solid fa-chevron-down chev"></i>
+
+
+      <nav class="menu" id="menu">
+      <a href="index.html"><i class="fa-solid fa-layer-group"></i>Image2Sheet</a>
+      <a href="image2scale.html"><i class="fa-solid fa-up-right-and-down-left-from-center"></i>Image2Scale</a>
+      <a href="image2direct.html"><i class="fa-solid fa-shirt"></i>Image2Direct</a>
+      <a href="cards.html"><i class="fa-solid fa-clone"></i>Playing Cards</a>
+      </nav>
+    </div>
+
+    <div class="grid">
+      <!-- LEFT: controls -->
+      <div>
+        <div class="drop" id="dropZone">
+          <div class="icon"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+          <strong>Drop image here</strong>
+          <div>or click to choose a file</div>
+          <small>PNG / JPG / WEBP</small>
+          <input type="file" id="fileInput" hidden accept="image/*" />
+        </div>
+
+        <div class="controls">
+          <div class="control">
+            <label for="alphaThresh">Clean threshold (live)</label>
+            <div class="rangeRow">
+              <input id="alphaThresh" type="range" min="1" max="254" value="90" />
+              <div class="pill"><span id="alphaThreshVal">90</span>/255</div>
+            </div>
+            <div class="hint">Higher = keeps more of the subject. Updates outline + cut instantly (no re-run).</div>
+          </div>
+
+          <div class="actions">
+            <button class="btn" id="runBtn" disabled>
+              <i class="fa-solid fa-bolt"></i> Execute
+            </button>
+            <button class="btn secondary" id="downloadBtn" disabled>
+              <i class="fa-solid fa-download"></i> Download PNG
+            </button>
+            <button class="btn ghost" id="clearBtn" disabled>
+              <i class="fa-solid fa-trash"></i> Clear
+            </button>
+          </div>
+
+          <div class="hint" id="statusTxt">Idle</div>
+        </div>
+      </div>
+
+      <!-- RIGHT: preview -->
+      <div class="previewCard">
+        <div class="hud">
+          <div class="chip" title="Scroll to zoom • Drag to pan">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span id="zoomTxt">60%</span>
+          </div>
+        </div>
+        <div class="stage" id="stage" aria-label="preview">
+          <canvas id="out"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="progress-overlay" id="progressOverlay">
+    <div class="progress-box">
+      <p class="progress-title" id="progressTitle">Working…</p>
+      <p class="progress-sub" id="progressSub">Please wait</p>
+      <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { removeBackground, preload } from "https://esm.sh/@imgly/background-removal@1.7.0";
+
+    const $ = (id) => document.getElementById(id);
+
+    // UI
+    const toolHeader = $("toolHeader");
+    const menu = $("menu");
+
+    const dropZone = $("dropZone");
+    const fileInput = $("fileInput");
+
+    const alphaThresh = $("alphaThresh");
+    const alphaThreshVal = $("alphaThreshVal");
+
+    const runBtn = $("runBtn");
+    const downloadBtn = $("downloadBtn");
+    const clearBtn = $("clearBtn");
+    const statusTxt = $("statusTxt");
+
+    const progressOverlay = $("progressOverlay");
+    const progressTitle = $("progressTitle");
+    const progressSub = $("progressSub");
+    const progressFill = $("progressFill");
+
+    // Canvas
+    const stage = $("stage");
+    const outCanvas = $("out");
+    const outCtx = outCanvas.getContext("2d", { alpha: true });
+
+    // Hard settings
+    const OUTLINE_PX = 10;
+    const PINK = "#ff3aa6";
+
+    // Mask cleanup knobs (kept internal; no UI)
+    const MAX_HOLE_FILL = 25000;      // fill holes up to this size (px)
+    const MIN_ISLAND_KEEP = 600;      // remove tiny subject islands (px)
+    const LIVE_DEBOUNCE_MS = 60;
+
+    // State
+    let originalFile = null;
+    let outputBlob = null;
+
+    let origBmp = null;              // original image bitmap (color source)
+    let cutoutAlpha = null;          // Uint8Array alpha from background removal result (soft)
+    let imgW = 1, imgH = 1;
+
+    let mask = null;                 // Uint8Array binary (0/1) after cleanup
+    let outlineImageData = null;     // ImageData of pink outline (outside only)
+    let subjectImageData = null;     // ImageData of hard-cut subject (binary alpha)
+
+    // View (preserve behaviour)
+    let viewScale = 0.6;
+    let viewTX = 0;
+    let viewTY = 0;
+    let pointerDown = false;
+    let dragStart = { x: 0, y: 0, tx: 0, ty: 0 };
+
+    // Utils
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+    function setStatus(t){
+      statusTxt.textContent = t;
+    }
+
+    function showProgress(title, sub, pct){
+      progressTitle.textContent = title || "Working…";
+      progressSub.textContent = sub || "";
+      progressFill.style.width = (pct ?? 0) + "%";
+      progressOverlay.style.display = "flex";
+    }
+    function hideProgress(){
+      progressOverlay.style.display = "none";
+    }
+
+    function updateZoomText(){
+      $("zoomTxt").textContent = Math.round(viewScale * 100) + "%";
+    }
+
+    function resizeCanvas(){
+      const rect = stage.getBoundingClientRect();
+      outCanvas.width = Math.max(1, Math.floor(rect.width));
+      outCanvas.height = Math.max(1, Math.floor(rect.height));
+      redraw();
+    }
+    window.addEventListener("resize", resizeCanvas);
+
+    function setButtons(){
+      runBtn.disabled = !originalFile;
+      clearBtn.disabled = !originalFile;
+      downloadBtn.disabled = !outputBlob;
+      alphaThresh.disabled = !cutoutAlpha;
+    }
+
+    async function fileToBitmap(file){
+      const url = URL.createObjectURL(file);
+      try{
+        const img = await createImageBitmap(file);
+        return img;
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    }
+
+    // Build alpha buffer from BG-removed bitmap (no smoothing; just read pixels)
+    function bitmapToAlpha(bmp){
+      const c = document.createElement("canvas");
+      c.width = bmp.width;
+      c.height = bmp.height;
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0,0,c.width,c.height);
+      ctx.drawImage(bmp, 0, 0);
+      const img = ctx.getImageData(0,0,c.width,c.height);
+      const a = new Uint8Array(c.width * c.height);
+      for(let i=0, p=3; i<a.length; i++, p+=4) a[i] = img.data[p];
+      return a;
+    }
+
+    // Strict threshold -> binary
+    function alphaToBinary(alphaArr, w, h, threshold){
+      const out = new Uint8Array(w*h);
+      for(let i=0;i<out.length;i++){
+        out[i] = (alphaArr[i] >= threshold) ? 1 : 0;
+      }
+      return out;
+    }
+
+    // Connected components: keep largest component (main silhouette) but allow "attached" nearby? -> strict largest.
+    function keepLargestComponent(bin, w, h){
+      const visited = new Uint8Array(w*h);
+      const q = new Int32Array(w*h);
+      let bestSize = 0;
+      let bestStart = -1;
+
+      for(let i=0;i<bin.length;i++){
+        if(!bin[i] || visited[i]) continue;
+
+        // BFS
+        let head=0, tail=0;
+        q[tail++] = i;
+        visited[i] = 1;
+        let size=0;
+
+        while(head<tail){
+          const idx = q[head++];
+          size++;
+          const x = idx % w;
+          const y = (idx / w) | 0;
+
+          const n1 = idx - 1;
+          const n2 = idx + 1;
+          const n3 = idx - w;
+          const n4 = idx + w;
+
+          if(x>0 && bin[n1] && !visited[n1]){ visited[n1]=1; q[tail++]=n1; }
+          if(x<w-1 && bin[n2] && !visited[n2]){ visited[n2]=1; q[tail++]=n2; }
+          if(y>0 && bin[n3] && !visited[n3]){ visited[n3]=1; q[tail++]=n3; }
+          if(y<h-1 && bin[n4] && !visited[n4]){ visited[n4]=1; q[tail++]=n4; }
+        }
+
+        if(size > bestSize){
+          bestSize = size;
+          bestStart = i;
+        }
+      }
+
+      if(bestStart === -1) return { bin, keptSize: 0 };
+
+      // Rebuild only largest
+      const out = new Uint8Array(w*h);
+      const q2 = new Int32Array(w*h);
+      let head=0, tail=0;
+      q2[tail++] = bestStart;
+      out[bestStart]=1;
+
+      while(head<tail){
+        const idx = q2[head++];
+        const x = idx % w;
+        const y = (idx / w) | 0;
+
+        const n1 = idx - 1;
+        const n2 = idx + 1;
+        const n3 = idx - w;
+        const n4 = idx + w;
+
+        if(x>0 && bin[n1] && !out[n1]){ out[n1]=1; q2[tail++]=n1; }
+        if(x<w-1 && bin[n2] && !out[n2]){ out[n2]=1; q2[tail++]=n2; }
+        if(y>0 && bin[n3] && !out[n3]){ out[n3]=1; q2[tail++]=n3; }
+        if(y<h-1 && bin[n4] && !out[n4]){ out[n4]=1; q2[tail++]=n4; }
+      }
+
+      return { bin: out, keptSize: bestSize };
+    }
+
+    // Remove tiny subject islands (after largest keep, this mostly becomes no-op; kept for safety if largest step is skipped)
+    function removeSmallIslands(bin, w, h, minSize){
+      const visited = new Uint8Array(w*h);
+      const q = new Int32Array(w*h);
+      const out = bin.slice();
+
+      for(let i=0;i<bin.length;i++){
+        if(!out[i] || visited[i]) continue;
+
+        let head=0, tail=0;
+        q[tail++] = i;
+        visited[i] = 1;
+
+        const comp = [];
+        while(head<tail){
+          const idx = q[head++];
+          comp.push(idx);
+          const x = idx % w;
+          const y = (idx / w) | 0;
+
+          const n1 = idx - 1;
+          const n2 = idx + 1;
+          const n3 = idx - w;
+          const n4 = idx + w;
+
+          if(x>0 && out[n1] && !visited[n1]){ visited[n1]=1; q[tail++]=n1; }
+          if(x<w-1 && out[n2] && !visited[n2]){ visited[n2]=1; q[tail++]=n2; }
+          if(y>0 && out[n3] && !visited[n3]){ visited[n3]=1; q[tail++]=n3; }
+          if(y<h-1 && out[n4] && !visited[n4]){ visited[n4]=1; q[tail++]=n4; }
+        }
+
+        if(comp.length < minSize){
+          for(const idx of comp) out[idx]=0;
+        }
+      }
+      return out;
+    }
+
+    // Fill holes inside the subject (invert, flood from border to mark exterior background; remaining 0s are holes)
+    function fillSmallHoles(bin, w, h, maxHoleSize){
+      const inv = new Uint8Array(w*h);
+      for(let i=0;i<inv.length;i++) inv[i] = bin[i] ? 0 : 1; // background =1
+
+      const exterior = new Uint8Array(w*h);
+      const q = new Int32Array(w*h);
+      let head=0, tail=0;
+
+      function push(idx){
+        if(exterior[idx]) return;
+        if(!inv[idx]) return;
+        exterior[idx]=1;
+        q[tail++] = idx;
+      }
+
+      // border flood fill on background
+      for(let x=0;x<w;x++){
+        push(x);
+        push((h-1)*w + x);
+      }
+      for(let y=0;y<h;y++){
+        push(y*w);
+        push(y*w + (w-1));
+      }
+      while(head<tail){
+        const idx = q[head++];
+        const x = idx % w;
+        const y = (idx / w) | 0;
+        const n1=idx-1, n2=idx+1, n3=idx-w, n4=idx+w;
+        if(x>0) push(n1);
+        if(x<w-1) push(n2);
+        if(y>0) push(n3);
+        if(y<h-1) push(n4);
+      }
+
+      // holes are background pixels (inv=1) that are NOT exterior
+      const visited = new Uint8Array(w*h);
+      const q2 = new Int32Array(w*h);
+      const out = bin.slice();
+
+      for(let i=0;i<inv.length;i++){
+        if(!inv[i] || exterior[i] || visited[i]) continue;
+
+        // BFS hole
+        let hHead=0, hTail=0;
+        q2[hTail++] = i;
+        visited[i]=1;
+
+        const hole = [];
+        while(hHead<hTail){
+          const idx = q2[hHead++];
+          hole.push(idx);
+          const x = idx % w;
+          const y = (idx / w) | 0;
+          const n1=idx-1, n2=idx+1, n3=idx-w, n4=idx+w;
+          if(x>0 && inv[n1] && !exterior[n1] && !visited[n1]){ visited[n1]=1; q2[hTail++]=n1; }
+          if(x<w-1 && inv[n2] && !exterior[n2] && !visited[n2]){ visited[n2]=1; q2[hTail++]=n2; }
+          if(y>0 && inv[n3] && !exterior[n3] && !visited[n3]){ visited[n3]=1; q2[hTail++]=n3; }
+          if(y<h-1 && inv[n4] && !exterior[n4] && !visited[n4]){ visited[n4]=1; q2[hTail++]=n4; }
+        }
+
+        if(hole.length <= maxHoleSize){
+          for(const idx of hole) out[idx]=1; // fill hole
+        }
+      }
+
+      return out;
+    }
+
+    // Dilation for outline (outside only)
+    function offsetsForRadius(r){
+      const pts=[];
+      const rr=r*r;
+      for(let y=-r;y<=r;y++){
+        for(let x=-r;x<=r;x++){
+          if(x*x + y*y <= rr) pts.push([x,y]);
+        }
+      }
+      return pts;
+    }
+
+    function computeExteriorBackgroundFromMask(subjectMask, w, h){
+      // exterior = background pixels connected to border
+      const exterior = new Uint8Array(w*h);
+      const q = new Int32Array(w*h);
+      let head=0, tail=0;
+
+      function tryPush(idx){
+        if(exterior[idx]) return;
+        if(subjectMask[idx] === 1) return; // subject blocks
+        exterior[idx]=1;
+        q[tail++] = idx;
+      }
+
+      for(let x=0;x<w;x++){
+        tryPush(x);
+        tryPush((h-1)*w + x);
+      }
+      for(let y=0;y<h;y++){
+        tryPush(y*w);
+        tryPush(y*w + (w-1));
+      }
+      while(head<tail){
+        const idx=q[head++];
+        const x = idx % w;
+        const y = (idx / w) | 0;
+        if(x>0) tryPush(idx-1);
+        if(x<w-1) tryPush(idx+1);
+        if(y>0) tryPush(idx-w);
+        if(y<h-1) tryPush(idx+w);
+      }
+      return exterior;
+    }
+
+    function dilateMask(subjectMask, w, h, radius){
+      const out = new Uint8Array(w*h);
+      const offsets = offsetsForRadius(radius);
+      for(let y=0;y<h;y++){
+        const row=y*w;
+        for(let x=0;x<w;x++){
+          const idx=row+x;
+          if(!subjectMask[idx]) continue;
+          for(const [dx,dy] of offsets){
+            const nx=x+dx, ny=y+dy;
+            if(nx<0||ny<0||nx>=w||ny>=h) continue;
+            out[ny*w+nx]=1;
+          }
+        }
+      }
+      return out;
+    }
+
+    function renderOutlineOutsideOnly(subjectMask, dilated, exterior, w, h, hexColor){
+      const img = new ImageData(w, h);
+      const d = img.data;
+
+      const hex = hexColor.replace("#", "");
+      const r = parseInt(hex.slice(0,2), 16);
+      const g = parseInt(hex.slice(2,4), 16);
+      const b = parseInt(hex.slice(4,6), 16);
+
+      for(let i=0, p=0;i<w*h;i++, p+=4){
+        const isOutline = (dilated[i] === 1 && subjectMask[i] === 0 && exterior[i] === 1);
+        if(isOutline){
+          d[p]=r; d[p+1]=g; d[p+2]=b; d[p+3]=255; // solid pink
+        }else{
+          d[p+3]=0;
+        }
+      }
+      return img;
+    }
+
+    // Hard-cut subject from ORIGINAL colour pixels using cleaned binary mask
+    function buildHardCutSubject(origBmp, subjectMask, w, h){
+      const c = document.createElement("canvas");
+      c.width = w; c.height = h;
+      const ctx = c.getContext("2d", { willReadFrequently: true });
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0,0,w,h);
+      ctx.drawImage(origBmp, 0, 0);
+
+      const img = ctx.getImageData(0,0,w,h);
+      const d = img.data;
+
+      for(let i=0, p=0;i<w*h;i++, p+=4){
+        if(subjectMask[i]){
+          d[p+3]=255;      // strict on
+        }else{
+          d[p]=0; d[p+1]=0; d[p+2]=0;
+          d[p+3]=0;        // strict off
+        }
+      }
+      return img;
+    }
+
+    function redraw(){
+      outCtx.clearRect(0,0,outCanvas.width,outCanvas.height);
+      if(!subjectImageData || !outlineImageData) return;
+
+      outCtx.imageSmoothingEnabled = false;
+
+      const cx = outCanvas.width/2 + viewTX;
+      const cy = outCanvas.height/2 + viewTY;
+
+      outCtx.save();
+      outCtx.translate(cx, cy);
+      outCtx.scale(viewScale, viewScale);
+      outCtx.translate(-imgW/2, -imgH/2);
+
+      // draw outline then subject, using offscreen canvases (no smoothing)
+      if(!redraw._tmp || redraw._tmp.width !== imgW || redraw._tmp.height !== imgH){
+        redraw._tmp = document.createElement("canvas");
+        redraw._tmp.width = imgW;
+        redraw._tmp.height = imgH;
+        redraw._tctx = redraw._tmp.getContext("2d");
+        redraw._tctx.imageSmoothingEnabled = false;
+
+        redraw._tmp2 = document.createElement("canvas");
+        redraw._tmp2.width = imgW;
+        redraw._tmp2.height = imgH;
+        redraw._tctx2 = redraw._tmp2.getContext("2d");
+        redraw._tctx2.imageSmoothingEnabled = false;
+      }
+
+      redraw._tctx.putImageData(outlineImageData, 0, 0);
+      outCtx.drawImage(redraw._tmp, 0, 0);
+
+      redraw._tctx2.putImageData(subjectImageData, 0, 0);
+      outCtx.drawImage(redraw._tmp2, 0, 0);
+
+      outCtx.restore();
+    }
+
+    async function updateExportBlob(){
+      if(!subjectImageData || !outlineImageData) return;
+
+      const exportCanvas = document.createElement("canvas");
+      exportCanvas.width = imgW;
+      exportCanvas.height = imgH;
+      const ctx = exportCanvas.getContext("2d", { alpha: true });
+
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0,0,imgW,imgH);
+
+      ctx.putImageData(outlineImageData, 0, 0);
+      ctx.putImageData(subjectImageData, 0, 0);
+
+      outputBlob = await new Promise((resolve) => exportCanvas.toBlob((b)=>resolve(b), "image/png"));
+      setButtons();
+    }
+
+    // Full pipeline from cached cutoutAlpha + current threshold (NO background-removal re-run)
+    async function rebuildFromThreshold(threshold){
+      if(!cutoutAlpha || !origBmp) return;
+
+      // 1) strict threshold (binary)
+      let bin = alphaToBinary(cutoutAlpha, imgW, imgH, threshold);
+
+      // 2) reliability pass: keep one main silhouette wherever possible
+      const kept = keepLargestComponent(bin, imgW, imgH);
+      bin = kept.bin;
+
+      // 3) remove tiny islands (extra safety)
+      bin = removeSmallIslands(bin, imgW, imgH, MIN_ISLAND_KEEP);
+
+      // 4) fill small holes inside subject
+      bin = fillSmallHoles(bin, imgW, imgH, MAX_HOLE_FILL);
+
+      mask = bin;
+
+      // 5) outside-only outline from cleaned mask
+      const exterior = computeExteriorBackgroundFromMask(mask, imgW, imgH);
+      const dilated = dilateMask(mask, imgW, imgH, OUTLINE_PX);
+      outlineImageData = renderOutlineOutsideOnly(mask, dilated, exterior, imgW, imgH, PINK);
+
+      // 6) hard-cut subject (binary alpha, no feather)
+      subjectImageData = buildHardCutSubject(origBmp, mask, imgW, imgH);
+
+      redraw();
+      await updateExportBlob();
+    }
+
+    // Debounced live update
+    let liveTimer = null;
+    function scheduleLive(){
+      if(!cutoutAlpha) return;
+      if(liveTimer) clearTimeout(liveTimer);
+      liveTimer = setTimeout(async ()=>{
+        setStatus("Updating…");
+        await rebuildFromThreshold(Number(alphaThresh.value));
+        setStatus("Ready");
+      }, LIVE_DEBOUNCE_MS);
+    }
+
+    async function execute(){
+      if(!originalFile) return;
+
+      try{
+        showProgress("Preparing…", "Loading background removal model", 10);
+        setStatus("Loading…");
+        try{ await preload({}); }catch{}
+
+        showProgress("Removing background…", "This runs once per image", 35);
+        setStatus("Removing BG…");
+
+        // Load original image (colour source)
+        origBmp = await fileToBitmap(originalFile);
+
+        // Run background removal (we only use its alpha as a detection guide)
+        const cutoutBlob = await removeBackground(originalFile);
+        const cutoutBmp = await createImageBitmap(cutoutBlob);
+
+        imgW = cutoutBmp.width;
+        imgH = cutoutBmp.height;
+
+        // Cache soft alpha (we'll ignore it after thresholding)
+        cutoutAlpha = bitmapToAlpha(cutoutBmp);
+
+        // Reset view
+        viewScale = 0.6;
+        viewTX = 0;
+        viewTY = 0;
+        updateZoomText();
+
+        // Build everything at current threshold
+        showProgress("Cleaning mask…", "Hard cut + outline", 70);
+        setStatus("Cleaning…");
+        await rebuildFromThreshold(Number(alphaThresh.value));
+
+        showProgress("Done", "Preview ready", 100);
+        setStatus("Ready");
+        setTimeout(hideProgress, 180);
+      } catch (err){
+        console.error(err);
+        hideProgress();
+        setStatus("Error (check console)");
+      }
+    }
+
+    function clearAll(){
+      originalFile = null;
+      outputBlob = null;
+      origBmp = null;
+      cutoutAlpha = null;
+
+      mask = null;
+      outlineImageData = null;
+      subjectImageData = null;
+      imgW = imgH = 1;
+
+      fileInput.value = "";
+      outCtx.clearRect(0,0,outCanvas.width,outCanvas.height);
+
+      viewScale = 0.6;
+      viewTX = 0;
+      viewTY = 0;
+      updateZoomText();
+
+      setStatus("Idle");
+      setButtons();
+    }
+
+    // -------- View interactions (preserve behaviour) --------
+    stage.addEventListener("wheel", (evt) => {
+      if(!subjectImageData) return;
+      evt.preventDefault();
+
+      const rect = outCanvas.getBoundingClientRect();
+      const sx = (evt.clientX - rect.left);
+      const sy = (evt.clientY - rect.top);
+
+      const cx = outCanvas.width / 2 + viewTX;
+      const cy = outCanvas.height / 2 + viewTY;
+
+      const wx = (sx - cx) / viewScale;
+      const wy = (sy - cy) / viewScale;
+
+      const zoomFactor = Math.exp((-evt.deltaY) * 0.0015);
+      const newScale = clamp(viewScale * zoomFactor, 0.15, 8);
+
+      viewTX = sx - outCanvas.width/2 - wx * newScale;
+      viewTY = sy - outCanvas.height/2 - wy * newScale;
+
+      viewScale = newScale;
+      updateZoomText();
+      redraw();
+    }, { passive:false });
+
+    stage.addEventListener("pointerdown", (evt) => {
+      if(!subjectImageData) return;
+      pointerDown = true;
+      stage.setPointerCapture(evt.pointerId);
+      dragStart = { x: evt.clientX, y: evt.clientY, tx: viewTX, ty: viewTY };
+    });
+
+    stage.addEventListener("pointermove", (evt) => {
+      if(!pointerDown) return;
+      const dx = evt.clientX - dragStart.x;
+      const dy = evt.clientY - dragStart.y;
+      viewTX = dragStart.tx + dx;
+      viewTY = dragStart.ty + dy;
+      redraw();
+    });
+
+    stage.addEventListener("pointerup", () => {
+      pointerDown = false;
+    });
+    stage.addEventListener("pointercancel", () => {
+      pointerDown = false;
+    });
+
+    // -------- UI wiring --------
+    toolHeader.addEventListener("click", (e) => {
+      // allow clicks on menu links to not toggle twice
+      if(e.target.closest("a")) return;
+      menu.classList.toggle("show");
+    });
+    document.addEventListener("click", (e) => {
+      if(!e.target.closest("#toolHeader")) menu.classList.remove("show");
+    });
+
+    dropZone.addEventListener("click", () => fileInput.click());
+
+    ["dragenter","dragover"].forEach(ev => {
+      dropZone.addEventListener(ev, (e) => {
+        e.preventDefault();
+        dropZone.classList.add("isDrag");
+      });
+    });
+    ["dragleave","drop"].forEach(ev => {
+      dropZone.addEventListener(ev, (e) => {
+        e.preventDefault();
+        dropZone.classList.remove("isDrag");
+      });
+    });
+    dropZone.addEventListener("drop", (e) => {
+      e.preventDefault();
+      const f = e.dataTransfer?.files?.[0];
+      if(f){
+        fileInput.files = e.dataTransfer.files;
+        originalFile = f;
+        outputBlob = null;
+        setStatus("Ready");
+        setButtons();
+      }
+    });
+
+    fileInput.addEventListener("change", () => {
+      originalFile = fileInput.files?.[0] || null;
+      outputBlob = null;
+      origBmp = null;
+      cutoutAlpha = null;
+      outlineImageData = null;
+      subjectImageData = null;
+      setStatus(originalFile ? "Ready" : "Idle");
+      setButtons();
+      redraw();
+    });
+
+    runBtn.addEventListener("click", execute);
+
+    downloadBtn.addEventListener("click", () => {
+      if(!outputBlob) return;
+      const url = URL.createObjectURL(outputBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "image-to-direct.png";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1200);
+    });
+
+    clearBtn.addEventListener("click", clearAll);
+
+    alphaThresh.addEventListener("input", () => {
+      alphaThreshVal.textContent = alphaThresh.value;
+      // Live threshold only after execute (once we have cached alpha)
+      if(cutoutAlpha) scheduleLive();
+    });
+
+    // init
+    alphaThreshVal.textContent = alphaThresh.value;
+    setButtons();
+    updateZoomText();
+    resizeCanvas();
+    setStatus("Idle");
+  </script>
+</body>
+</html>
