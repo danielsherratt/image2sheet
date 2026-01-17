@@ -36,50 +36,41 @@
       box-shadow:var(--shadow);
     }
 
-    /* ---------- HEADER + MENU ---------- */
-    .header{
-      position:relative;
-      display:flex;
-      align-items:center;
-      gap:10px;
-      cursor:pointer;
-      user-select:none;
-    }
-    .header .mark{
-      width:36px;height:36px;
-      border-radius:10px;
-      display:grid;
-      place-items:center;
-      background: rgba(43,108,176,.12);
-      color: var(--accent);
-      border: 1px solid rgba(43,108,176,.22);
-    }
-    .header h1{ margin:0;font-size:22px;font-weight:650; }
-    .header .chev{ margin-left:auto;color:#666; }
+    /* ---------- HEADER ---------- */
+.header{
+  position:relative;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  cursor:pointer;
+}
+.header img{ width:36px;height:36px; }
+.header h1{ margin:0;font-size:22px;font-weight:650; }
+.header .chev{ margin-left:auto;color:#666; }
 
-    .menu{
-      position:absolute;
-      top:52px;
-      left:0;
-      min-width:230px;
-      background:#fff;
-      border:1px solid var(--border);
-      border-radius:10px;
-      box-shadow:var(--shadow);
-      display:none;
-      flex-direction:column;
-      z-index:50;
-    }
-    .menu.show{ display:flex; }
-    .menu a{
-      padding:12px 14px;
-      display:flex;
-      gap:10px;
-      text-decoration:none;
-      color:#111;
-      align-items:center;
-    }
-    .menu a:hover{ background:#f1f3f5; }
+.menu{
+  position:absolute;
+  top:52px;
+  left:0;
+  min-width:230px;
+  background:#fff;
+  border:1px solid var(--border);
+  border-radius:10px;
+  box-shadow:var(--shadow);
+  display:none;
+  flex-direction:column;
+  z-index:50;
+}
+.menu.show{ display:flex; }
+.menu a{
+  padding:12px 14px;
+  display:flex;
+  gap:10px;
+  text-decoration:none;
+  color:#111;
+}
+.menu a:hover{ background:#f1f3f5; }
+
 
     /* ---------- LAYOUT ---------- */
     .grid{
@@ -299,14 +290,13 @@
     <h1>Image2Direct</h1>
     <i class="fa-solid fa-chevron-down chev"></i>
 
-
-      <nav class="menu" id="menu">
+    <nav class="menu" id="menu">
       <a href="index.html"><i class="fa-solid fa-layer-group"></i>Image2Sheet</a>
       <a href="image2scale.html"><i class="fa-solid fa-up-right-and-down-left-from-center"></i>Image2Scale</a>
       <a href="image2direct.html"><i class="fa-solid fa-shirt"></i>Image2Direct</a>
       <a href="cards.html"><i class="fa-solid fa-clone"></i>Playing Cards</a>
-      </nav>
-    </div>
+    </nav>
+  </div>
 
     <div class="grid">
       <!-- LEFT: controls -->
