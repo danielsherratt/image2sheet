@@ -327,6 +327,9 @@
             <button class="btn secondary" id="downloadBtn" disabled>
               <i class="fa-solid fa-download"></i> Download PNG
             </button>
+            <button class="btn secondary" id="downloadPdfBtn" disabled>
+              <i class="fa-solid fa-file-pdf"></i> Download PDF
+            </button>
             <button class="btn ghost" id="clearBtn" disabled>
               <i class="fa-solid fa-trash"></i> Clear
             </button>
@@ -361,6 +364,7 @@
 
   <script type="module">
     import { removeBackground, preload } from "https://esm.sh/@imgly/background-removal@1.7.0";
+    import { jsPDF } from "https://esm.sh/jspdf@2.5.1";
 
     const $ = (id) => document.getElementById(id);
 
@@ -376,6 +380,7 @@
 
     const runBtn = $("runBtn");
     const downloadBtn = $("downloadBtn");
+    const downloadPdfBtn = $("downloadPdfBtn");
     const clearBtn = $("clearBtn");
     const statusTxt = $("statusTxt");
 
@@ -416,6 +421,10 @@
     let viewTY = 0;
     let pointerDown = false;
     let dragStart = { x: 0, y: 0, tx: 0, ty: 0 };
+    const activePointers = new Map();
+    let isPinching = false;
+    let pinchStartDistance = 0;
+    let pinchStartScale = 1;
 
     // Utils
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -450,6 +459,7 @@
       runBtn.disabled = !originalFile;
       clearBtn.disabled = !originalFile;
       downloadBtn.disabled = !outputBlob;
+      downloadPdfBtn.disabled = !outputBlob;
       alphaThresh.disabled = !cutoutAlpha;
     }
 
@@ -806,9 +816,22 @@
       outCtx.restore();
     }
 
-    async function updateExportBlob(){
-      if(!subjectImageData || !outlineImageData) return;
+    function zoomAtPoint(sx, sy, newScale){
+      const cx = outCanvas.width / 2 + viewTX;
+      const cy = outCanvas.height / 2 + viewTY;
 
+      const wx = (sx - cx) / viewScale;
+      const wy = (sy - cy) / viewScale;
+
+      viewTX = sx - outCanvas.width / 2 - wx * newScale;
+      viewTY = sy - outCanvas.height / 2 - wy * newScale;
+
+      viewScale = newScale;
+      updateZoomText();
+      redraw();
+    }
+
+    function buildExportCanvas(){
       const exportCanvas = document.createElement("canvas");
       exportCanvas.width = imgW;
       exportCanvas.height = imgH;
@@ -819,7 +842,12 @@
 
       ctx.putImageData(outlineImageData, 0, 0);
       ctx.putImageData(subjectImageData, 0, 0);
+      return exportCanvas;
+    }
 
+    async function updateExportBlob(){
+      if(!subjectImageData || !outlineImageData) return;
+      const exportCanvas = buildExportCanvas();
       outputBlob = await new Promise((resolve) => exportCanvas.toBlob((b)=>resolve(b), "image/png"));
       setButtons();
     }
@@ -944,32 +972,45 @@
       const sx = (evt.clientX - rect.left);
       const sy = (evt.clientY - rect.top);
 
-      const cx = outCanvas.width / 2 + viewTX;
-      const cy = outCanvas.height / 2 + viewTY;
-
-      const wx = (sx - cx) / viewScale;
-      const wy = (sy - cy) / viewScale;
-
       const zoomFactor = Math.exp((-evt.deltaY) * 0.0015);
       const newScale = clamp(viewScale * zoomFactor, 0.15, 8);
-
-      viewTX = sx - outCanvas.width/2 - wx * newScale;
-      viewTY = sy - outCanvas.height/2 - wy * newScale;
-
-      viewScale = newScale;
-      updateZoomText();
-      redraw();
+      zoomAtPoint(sx, sy, newScale);
     }, { passive:false });
 
     stage.addEventListener("pointerdown", (evt) => {
       if(!subjectImageData) return;
-      pointerDown = true;
       stage.setPointerCapture(evt.pointerId);
-      dragStart = { x: evt.clientX, y: evt.clientY, tx: viewTX, ty: viewTY };
+      activePointers.set(evt.pointerId, { x: evt.clientX, y: evt.clientY });
+
+      if(activePointers.size === 1){
+        pointerDown = true;
+        dragStart = { x: evt.clientX, y: evt.clientY, tx: viewTX, ty: viewTY };
+      } else if(activePointers.size === 2){
+        pointerDown = false;
+        isPinching = true;
+        const [p1, p2] = Array.from(activePointers.values());
+        pinchStartDistance = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1;
+        pinchStartScale = viewScale;
+      }
     });
 
     stage.addEventListener("pointermove", (evt) => {
-      if(!pointerDown) return;
+      if(!activePointers.has(evt.pointerId)) return;
+      activePointers.set(evt.pointerId, { x: evt.clientX, y: evt.clientY });
+
+      if(activePointers.size === 2){
+        const [p1, p2] = Array.from(activePointers.values());
+        const distance = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+        if(!distance) return;
+        const rect = outCanvas.getBoundingClientRect();
+        const centerX = (p1.x + p2.x) / 2 - rect.left;
+        const centerY = (p1.y + p2.y) / 2 - rect.top;
+        const newScale = clamp(pinchStartScale * (distance / pinchStartDistance), 0.15, 8);
+        zoomAtPoint(centerX, centerY, newScale);
+        return;
+      }
+
+      if(!pointerDown || isPinching) return;
       const dx = evt.clientX - dragStart.x;
       const dy = evt.clientY - dragStart.y;
       viewTX = dragStart.tx + dx;
@@ -977,11 +1018,31 @@
       redraw();
     });
 
-    stage.addEventListener("pointerup", () => {
-      pointerDown = false;
+    stage.addEventListener("pointerup", (evt) => {
+      activePointers.delete(evt.pointerId);
+      if(activePointers.size < 2){
+        isPinching = false;
+      }
+      if(activePointers.size === 1){
+        const remaining = Array.from(activePointers.values())[0];
+        pointerDown = true;
+        dragStart = { x: remaining.x, y: remaining.y, tx: viewTX, ty: viewTY };
+      } else {
+        pointerDown = false;
+      }
     });
-    stage.addEventListener("pointercancel", () => {
-      pointerDown = false;
+    stage.addEventListener("pointercancel", (evt) => {
+      activePointers.delete(evt.pointerId);
+      if(activePointers.size < 2){
+        isPinching = false;
+      }
+      if(activePointers.size === 1){
+        const remaining = Array.from(activePointers.values())[0];
+        pointerDown = true;
+        dragStart = { x: remaining.x, y: remaining.y, tx: viewTX, ty: viewTY };
+      } else {
+        pointerDown = false;
+      }
     });
 
     // -------- UI wiring --------
@@ -1035,15 +1096,33 @@
     runBtn.addEventListener("click", execute);
 
     downloadBtn.addEventListener("click", () => {
-      if(!outputBlob) return;
-      const url = URL.createObjectURL(outputBlob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "image-to-direct.png";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1200);
+      if(!subjectImageData || !outlineImageData) return;
+      const exportCanvas = buildExportCanvas();
+      exportCanvas.toBlob((blob) => {
+        if(!blob) return;
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "image-to-direct.png";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1200);
+      }, "image/png");
+    });
+
+    downloadPdfBtn.addEventListener("click", () => {
+      if(!subjectImageData || !outlineImageData) return;
+      const exportCanvas = buildExportCanvas();
+      const dataUrl = exportCanvas.toDataURL("image/png");
+      const orientation = imgW >= imgH ? "landscape" : "portrait";
+      const pdf = new jsPDF({
+        orientation,
+        unit: "px",
+        format: [imgW, imgH],
+      });
+      pdf.addImage(dataUrl, "PNG", 0, 0, imgW, imgH);
+      pdf.save("image-to-direct.pdf");
     });
 
     clearBtn.addEventListener("click", clearAll);
