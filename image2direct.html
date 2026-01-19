@@ -840,8 +840,22 @@
       ctx.imageSmoothingEnabled = false;
       ctx.clearRect(0,0,imgW,imgH);
 
-      ctx.putImageData(outlineImageData, 0, 0);
-      ctx.putImageData(subjectImageData, 0, 0);
+      const outlineCanvas = document.createElement("canvas");
+      outlineCanvas.width = imgW;
+      outlineCanvas.height = imgH;
+      const outlineCtx = outlineCanvas.getContext("2d");
+      outlineCtx.imageSmoothingEnabled = false;
+      outlineCtx.putImageData(outlineImageData, 0, 0);
+
+      const subjectCanvas = document.createElement("canvas");
+      subjectCanvas.width = imgW;
+      subjectCanvas.height = imgH;
+      const subjectCtx = subjectCanvas.getContext("2d");
+      subjectCtx.imageSmoothingEnabled = false;
+      subjectCtx.putImageData(subjectImageData, 0, 0);
+
+      ctx.drawImage(outlineCanvas, 0, 0);
+      ctx.drawImage(subjectCanvas, 0, 0);
       return exportCanvas;
     }
 
