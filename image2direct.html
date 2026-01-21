@@ -419,6 +419,11 @@
     let viewScale = 0.6;
     let viewTX = 0;
     let viewTY = 0;
+    let outlineOffsetX = 0;
+    let outlineOffsetY = 0;
+    let outlineNode = null;
+    let draggingOutline = false;
+    let outlineDragStart = { x: 0, y: 0, ox: 0, oy: 0 };
     let pointerDown = false;
     let dragStart = { x: 0, y: 0, tx: 0, ty: 0 };
     const activePointers = new Map();
@@ -808,10 +813,25 @@
       }
 
       redraw._tctx.putImageData(outlineImageData, 0, 0);
-      outCtx.drawImage(redraw._tmp, 0, 0);
+      outCtx.drawImage(redraw._tmp, outlineOffsetX, outlineOffsetY);
 
       redraw._tctx2.putImageData(subjectImageData, 0, 0);
       outCtx.drawImage(redraw._tmp2, 0, 0);
+
+      if(outlineNode){
+        const nodeX = outlineNode.x + outlineOffsetX;
+        const nodeY = outlineNode.y + outlineOffsetY;
+        const radius = 6 / viewScale;
+        outCtx.save();
+        outCtx.lineWidth = Math.max(1 / viewScale, 0.5);
+        outCtx.fillStyle = "#fff";
+        outCtx.strokeStyle = PINK;
+        outCtx.beginPath();
+        outCtx.arc(nodeX, nodeY, radius, 0, Math.PI * 2);
+        outCtx.fill();
+        outCtx.stroke();
+        outCtx.restore();
+      }
 
       outCtx.restore();
     }
@@ -854,7 +874,7 @@
       subjectCtx.imageSmoothingEnabled = false;
       subjectCtx.putImageData(subjectImageData, 0, 0);
 
-      ctx.drawImage(outlineCanvas, 0, 0);
+      ctx.drawImage(outlineCanvas, outlineOffsetX, outlineOffsetY);
       ctx.drawImage(subjectCanvas, 0, 0);
       return exportCanvas;
     }
@@ -889,12 +909,43 @@
       const exterior = computeExteriorBackgroundFromMask(mask, imgW, imgH);
       const dilated = dilateMask(mask, imgW, imgH, OUTLINE_PX);
       outlineImageData = renderOutlineOutsideOnly(mask, dilated, exterior, imgW, imgH, PINK);
+      outlineOffsetX = 0;
+      outlineOffsetY = 0;
+      outlineNode = null;
 
       // 6) hard-cut subject (binary alpha, no feather)
       subjectImageData = buildHardCutSubject(origBmp, mask, imgW, imgH);
 
       redraw();
       await updateExportBlob();
+    }
+
+    function screenToImageCoords(evt){
+      const rect = outCanvas.getBoundingClientRect();
+      const sx = evt.clientX - rect.left;
+      const sy = evt.clientY - rect.top;
+      const cx = outCanvas.width / 2 + viewTX;
+      const cy = outCanvas.height / 2 + viewTY;
+      const ix = (sx - cx) / viewScale + imgW / 2;
+      const iy = (sy - cy) / viewScale + imgH / 2;
+      return { x: ix, y: iy };
+    }
+
+    function outlinePixelAt(ix, iy){
+      if(!outlineImageData) return 0;
+      const ox = Math.round(ix - outlineOffsetX);
+      const oy = Math.round(iy - outlineOffsetY);
+      if(ox < 0 || oy < 0 || ox >= imgW || oy >= imgH) return 0;
+      const idx = (oy * imgW + ox) * 4 + 3;
+      return outlineImageData.data[idx];
+    }
+
+    function hitOutlineNode(ix, iy){
+      if(!outlineNode) return false;
+      const nodeX = outlineNode.x + outlineOffsetX;
+      const nodeY = outlineNode.y + outlineOffsetY;
+      const radius = 10 / viewScale;
+      return Math.hypot(ix - nodeX, iy - nodeY) <= radius;
     }
 
     // Debounced live update
@@ -971,6 +1022,9 @@
       viewScale = 0.6;
       viewTX = 0;
       viewTY = 0;
+      outlineOffsetX = 0;
+      outlineOffsetY = 0;
+      outlineNode = null;
       updateZoomText();
 
       setStatus("Idle");
@@ -997,9 +1051,31 @@
       activePointers.set(evt.pointerId, { x: evt.clientX, y: evt.clientY });
 
       if(activePointers.size === 1){
+        const imgPos = screenToImageCoords(evt);
+        const onNode = hitOutlineNode(imgPos.x, imgPos.y);
+        const onOutline = outlinePixelAt(imgPos.x, imgPos.y) > 0;
+
+        if(onNode || onOutline){
+          if(!outlineNode && onOutline){
+            outlineNode = { x: imgPos.x - outlineOffsetX, y: imgPos.y - outlineOffsetY };
+          }
+          draggingOutline = true;
+          pointerDown = false;
+          outlineDragStart = {
+            x: imgPos.x,
+            y: imgPos.y,
+            ox: outlineOffsetX,
+            oy: outlineOffsetY,
+          };
+          redraw();
+          return;
+        }
+
+        draggingOutline = false;
         pointerDown = true;
         dragStart = { x: evt.clientX, y: evt.clientY, tx: viewTX, ty: viewTY };
       } else if(activePointers.size === 2){
+        draggingOutline = false;
         pointerDown = false;
         isPinching = true;
         const [p1, p2] = Array.from(activePointers.values());
@@ -1024,6 +1100,15 @@
         return;
       }
 
+      if(draggingOutline){
+        const imgPos = screenToImageCoords(evt);
+        outlineOffsetX = outlineDragStart.ox + (imgPos.x - outlineDragStart.x);
+        outlineOffsetY = outlineDragStart.oy + (imgPos.y - outlineDragStart.y);
+        redraw();
+        updateExportBlob();
+        return;
+      }
+
       if(!pointerDown || isPinching) return;
       const dx = evt.clientX - dragStart.x;
       const dy = evt.clientY - dragStart.y;
@@ -1034,6 +1119,7 @@
 
     stage.addEventListener("pointerup", (evt) => {
       activePointers.delete(evt.pointerId);
+      draggingOutline = false;
       if(activePointers.size < 2){
         isPinching = false;
       }
@@ -1047,6 +1133,7 @@
     });
     stage.addEventListener("pointercancel", (evt) => {
       activePointers.delete(evt.pointerId);
+      draggingOutline = false;
       if(activePointers.size < 2){
         isPinching = false;
       }
@@ -1102,6 +1189,9 @@
       cutoutAlpha = null;
       outlineImageData = null;
       subjectImageData = null;
+      outlineOffsetX = 0;
+      outlineOffsetY = 0;
+      outlineNode = null;
       setStatus(originalFile ? "Ready" : "Idle");
       setButtons();
       redraw();
