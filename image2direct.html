@@ -421,7 +421,7 @@
     let viewTY = 0;
     let outlineOffsetX = 0;
     let outlineOffsetY = 0;
-    let outlineNode = null;
+    let outlineNodes = [];
     let draggingOutline = false;
     let outlineDragStart = { x: 0, y: 0, ox: 0, oy: 0 };
     let pointerDown = false;
@@ -797,7 +797,7 @@
       outCtx.scale(viewScale, viewScale);
       outCtx.translate(-imgW/2, -imgH/2);
 
-      // draw outline then subject, using offscreen canvases (no smoothing)
+      // draw subject then outline, using offscreen canvases (no smoothing)
       if(!redraw._tmp || redraw._tmp.width !== imgW || redraw._tmp.height !== imgH){
         redraw._tmp = document.createElement("canvas");
         redraw._tmp.width = imgW;
@@ -812,24 +812,26 @@
         redraw._tctx2.imageSmoothingEnabled = false;
       }
 
-      redraw._tctx.putImageData(outlineImageData, 0, 0);
-      outCtx.drawImage(redraw._tmp, outlineOffsetX, outlineOffsetY);
-
       redraw._tctx2.putImageData(subjectImageData, 0, 0);
       outCtx.drawImage(redraw._tmp2, 0, 0);
 
-      if(outlineNode){
-        const nodeX = outlineNode.x + outlineOffsetX;
-        const nodeY = outlineNode.y + outlineOffsetY;
+      redraw._tctx.putImageData(outlineImageData, 0, 0);
+      outCtx.drawImage(redraw._tmp, outlineOffsetX, outlineOffsetY);
+
+      if(outlineNodes.length){
         const radius = 6 / viewScale;
         outCtx.save();
         outCtx.lineWidth = Math.max(1 / viewScale, 0.5);
         outCtx.fillStyle = "#fff";
         outCtx.strokeStyle = PINK;
-        outCtx.beginPath();
-        outCtx.arc(nodeX, nodeY, radius, 0, Math.PI * 2);
-        outCtx.fill();
-        outCtx.stroke();
+        outlineNodes.forEach((node) => {
+          const nodeX = node.x + outlineOffsetX;
+          const nodeY = node.y + outlineOffsetY;
+          outCtx.beginPath();
+          outCtx.arc(nodeX, nodeY, radius, 0, Math.PI * 2);
+          outCtx.fill();
+          outCtx.stroke();
+        });
         outCtx.restore();
       }
 
@@ -874,8 +876,8 @@
       subjectCtx.imageSmoothingEnabled = false;
       subjectCtx.putImageData(subjectImageData, 0, 0);
 
-      ctx.drawImage(outlineCanvas, outlineOffsetX, outlineOffsetY);
       ctx.drawImage(subjectCanvas, 0, 0);
+      ctx.drawImage(outlineCanvas, outlineOffsetX, outlineOffsetY);
       return exportCanvas;
     }
 
@@ -911,7 +913,7 @@
       outlineImageData = renderOutlineOutsideOnly(mask, dilated, exterior, imgW, imgH, PINK);
       outlineOffsetX = 0;
       outlineOffsetY = 0;
-      outlineNode = null;
+      outlineNodes = [];
 
       // 6) hard-cut subject (binary alpha, no feather)
       subjectImageData = buildHardCutSubject(origBmp, mask, imgW, imgH);
@@ -941,11 +943,15 @@
     }
 
     function hitOutlineNode(ix, iy){
-      if(!outlineNode) return false;
-      const nodeX = outlineNode.x + outlineOffsetX;
-      const nodeY = outlineNode.y + outlineOffsetY;
+      if(!outlineNodes.length) return -1;
       const radius = 10 / viewScale;
-      return Math.hypot(ix - nodeX, iy - nodeY) <= radius;
+      for(let i=0;i<outlineNodes.length;i++){
+        const node = outlineNodes[i];
+        const nodeX = node.x + outlineOffsetX;
+        const nodeY = node.y + outlineOffsetY;
+        if(Math.hypot(ix - nodeX, iy - nodeY) <= radius) return i;
+      }
+      return -1;
     }
 
     // Debounced live update
@@ -1024,7 +1030,7 @@
       viewTY = 0;
       outlineOffsetX = 0;
       outlineOffsetY = 0;
-      outlineNode = null;
+      outlineNodes = [];
       updateZoomText();
 
       setStatus("Idle");
@@ -1052,12 +1058,12 @@
 
       if(activePointers.size === 1){
         const imgPos = screenToImageCoords(evt);
-        const onNode = hitOutlineNode(imgPos.x, imgPos.y);
+        const nodeIndex = hitOutlineNode(imgPos.x, imgPos.y);
         const onOutline = outlinePixelAt(imgPos.x, imgPos.y) > 0;
 
-        if(onNode || onOutline){
-          if(!outlineNode && onOutline){
-            outlineNode = { x: imgPos.x - outlineOffsetX, y: imgPos.y - outlineOffsetY };
+        if(nodeIndex !== -1 || onOutline){
+          if(nodeIndex === -1 && onOutline){
+            outlineNodes.push({ x: imgPos.x - outlineOffsetX, y: imgPos.y - outlineOffsetY });
           }
           draggingOutline = true;
           pointerDown = false;
@@ -1191,7 +1197,7 @@
       subjectImageData = null;
       outlineOffsetX = 0;
       outlineOffsetY = 0;
-      outlineNode = null;
+      outlineNodes = [];
       setStatus(originalFile ? "Ready" : "Idle");
       setButtons();
       redraw();
