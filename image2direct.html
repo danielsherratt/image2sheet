@@ -396,6 +396,7 @@
 
     // Hard settings
     const OUTLINE_PX = 10;
+    const MASK_PADDING_PX = 6;
     const PINK = "#ff3aa6";
 
     // Mask cleanup knobs (kept internal; no UI)
@@ -410,6 +411,7 @@
     let origBmp = null;              // original image bitmap (color source)
     let cutoutAlpha = null;          // Uint8Array alpha from background removal result (soft)
     let imgW = 1, imgH = 1;
+    let renderW = 1, renderH = 1;
 
     let mask = null;                 // Uint8Array binary (0/1) after cleanup
     let outlineImageData = null;     // ImageData of pink outline (outside only)
@@ -755,6 +757,46 @@
       return img;
     }
 
+    function getMaskBounds(maskArr, w, h){
+      let minX = w, minY = h, maxX = -1, maxY = -1;
+      for(let y=0;y<h;y++){
+        const row = y * w;
+        for(let x=0;x<w;x++){
+          if(!maskArr[row + x]) continue;
+          if(x < minX) minX = x;
+          if(y < minY) minY = y;
+          if(x > maxX) maxX = x;
+          if(y > maxY) maxY = y;
+        }
+      }
+
+      if(maxX < 0){
+        return { x: 0, y: 0, w: Math.max(1, w), h: Math.max(1, h) };
+      }
+
+      return { x: minX, y: minY, w: maxX - minX + 1, h: maxY - minY + 1 };
+    }
+
+    function cropImageData(img, srcW, srcH, bounds){
+      const out = new ImageData(bounds.w, bounds.h);
+      const src = img.data;
+      const dst = out.data;
+
+      for(let y=0;y<bounds.h;y++){
+        const srcRow = (bounds.y + y) * srcW;
+        const dstRow = y * bounds.w;
+        for(let x=0;x<bounds.w;x++){
+          const srcIdx = (srcRow + bounds.x + x) * 4;
+          const dstIdx = (dstRow + x) * 4;
+          dst[dstIdx] = src[srcIdx];
+          dst[dstIdx + 1] = src[srcIdx + 1];
+          dst[dstIdx + 2] = src[srcIdx + 2];
+          dst[dstIdx + 3] = src[srcIdx + 3];
+        }
+      }
+      return out;
+    }
+
     // Hard-cut subject from ORIGINAL colour pixels using cleaned binary mask
     function buildHardCutSubject(origBmp, subjectMask, w, h){
       const c = document.createElement("canvas");
@@ -790,19 +832,19 @@
       outCtx.save();
       outCtx.translate(cx, cy);
       outCtx.scale(viewScale, viewScale);
-      outCtx.translate(-imgW/2, -imgH/2);
+      outCtx.translate(-renderW/2, -renderH/2);
 
       // draw outline then subject, using offscreen canvases (no smoothing)
-      if(!redraw._tmp || redraw._tmp.width !== imgW || redraw._tmp.height !== imgH){
+      if(!redraw._tmp || redraw._tmp.width !== renderW || redraw._tmp.height !== renderH){
         redraw._tmp = document.createElement("canvas");
-        redraw._tmp.width = imgW;
-        redraw._tmp.height = imgH;
+        redraw._tmp.width = renderW;
+        redraw._tmp.height = renderH;
         redraw._tctx = redraw._tmp.getContext("2d");
         redraw._tctx.imageSmoothingEnabled = false;
 
         redraw._tmp2 = document.createElement("canvas");
-        redraw._tmp2.width = imgW;
-        redraw._tmp2.height = imgH;
+        redraw._tmp2.width = renderW;
+        redraw._tmp2.height = renderH;
         redraw._tctx2 = redraw._tmp2.getContext("2d");
         redraw._tctx2.imageSmoothingEnabled = false;
       }
@@ -833,23 +875,23 @@
 
     function buildExportCanvas(){
       const exportCanvas = document.createElement("canvas");
-      exportCanvas.width = imgW;
-      exportCanvas.height = imgH;
+      exportCanvas.width = renderW;
+      exportCanvas.height = renderH;
       const ctx = exportCanvas.getContext("2d", { alpha: true });
 
       ctx.imageSmoothingEnabled = false;
-      ctx.clearRect(0,0,imgW,imgH);
+      ctx.clearRect(0,0,renderW,renderH);
 
       const outlineCanvas = document.createElement("canvas");
-      outlineCanvas.width = imgW;
-      outlineCanvas.height = imgH;
+      outlineCanvas.width = renderW;
+      outlineCanvas.height = renderH;
       const outlineCtx = outlineCanvas.getContext("2d");
       outlineCtx.imageSmoothingEnabled = false;
       outlineCtx.putImageData(outlineImageData, 0, 0);
 
       const subjectCanvas = document.createElement("canvas");
-      subjectCanvas.width = imgW;
-      subjectCanvas.height = imgH;
+      subjectCanvas.width = renderW;
+      subjectCanvas.height = renderH;
       const subjectCtx = subjectCanvas.getContext("2d");
       subjectCtx.imageSmoothingEnabled = false;
       subjectCtx.putImageData(subjectImageData, 0, 0);
@@ -885,13 +927,21 @@
 
       mask = bin;
 
-      // 5) outside-only outline from cleaned mask
-      const exterior = computeExteriorBackgroundFromMask(mask, imgW, imgH);
-      const dilated = dilateMask(mask, imgW, imgH, OUTLINE_PX);
-      outlineImageData = renderOutlineOutsideOnly(mask, dilated, exterior, imgW, imgH, PINK);
+      // 5) add padding, then generate outside-only outline
+      const paddedMask = dilateMask(mask, imgW, imgH, MASK_PADDING_PX);
+      const exterior = computeExteriorBackgroundFromMask(paddedMask, imgW, imgH);
+      const outlineDilated = dilateMask(paddedMask, imgW, imgH, OUTLINE_PX);
+      const outlineFull = renderOutlineOutsideOnly(paddedMask, outlineDilated, exterior, imgW, imgH, PINK);
 
       // 6) hard-cut subject (binary alpha, no feather)
-      subjectImageData = buildHardCutSubject(origBmp, mask, imgW, imgH);
+      const subjectFull = buildHardCutSubject(origBmp, mask, imgW, imgH);
+
+      // 7) trim everything past the pink outline
+      const renderBounds = getMaskBounds(outlineDilated, imgW, imgH);
+      renderW = renderBounds.w;
+      renderH = renderBounds.h;
+      outlineImageData = cropImageData(outlineFull, imgW, imgH, renderBounds);
+      subjectImageData = cropImageData(subjectFull, imgW, imgH, renderBounds);
 
       redraw();
       await updateExportBlob();
@@ -929,6 +979,8 @@
 
         imgW = cutoutBmp.width;
         imgH = cutoutBmp.height;
+        renderW = imgW;
+        renderH = imgH;
 
         // Cache soft alpha (we'll ignore it after thresholding)
         cutoutAlpha = bitmapToAlpha(cutoutBmp);
@@ -964,6 +1016,7 @@
       outlineImageData = null;
       subjectImageData = null;
       imgW = imgH = 1;
+      renderW = renderH = 1;
 
       fileInput.value = "";
       outCtx.clearRect(0,0,outCanvas.width,outCanvas.height);
@@ -1129,13 +1182,13 @@
       if(!subjectImageData || !outlineImageData) return;
       const exportCanvas = buildExportCanvas();
       const dataUrl = exportCanvas.toDataURL("image/png");
-      const orientation = imgW >= imgH ? "landscape" : "portrait";
+      const orientation = renderW >= renderH ? "landscape" : "portrait";
       const pdf = new jsPDF({
         orientation,
         unit: "px",
-        format: [imgW, imgH],
+        format: [renderW, renderH],
       });
-      pdf.addImage(dataUrl, "PNG", 0, 0, imgW, imgH);
+      pdf.addImage(dataUrl, "PNG", 0, 0, renderW, renderH);
       pdf.save("image-to-direct.pdf");
     });
 
